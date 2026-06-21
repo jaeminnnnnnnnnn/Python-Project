@@ -1,0 +1,15 @@
+.git
+.pytest_cache
+__pycache__
+*.pyc
+dist
+build
+*.spec
+server.log
+server.err.log
+client/assets/music
+client/assets/sfx
+client/assets/images
+client/assets/effects
+client/assets/fonts
+

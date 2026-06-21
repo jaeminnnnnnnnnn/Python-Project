@@ -1,0 +1,2 @@
+python -m client.main
+

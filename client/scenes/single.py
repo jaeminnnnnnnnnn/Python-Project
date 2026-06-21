@@ -1,0 +1,109 @@
+import pygame
+
+from client.audio import sfx
+from client.constants import BLACK, CYAN, GRAY, WHITE
+from client.scenes.base import Scene
+from client.tetris.rules import TetrisGame
+from client.ui.tetris_panel import draw_tetris_panel
+
+
+PANEL_X = 280
+PANEL_Y = 95
+
+
+class SingleScene(Scene):
+    def __init__(self, app) -> None:
+        super().__init__(app)
+        self.game = TetrisGame()
+        self.fall_elapsed = 0.0
+
+    def on_enter(self) -> None:
+        self.game = TetrisGame()
+        self.fall_elapsed = 0.0
+        self.app.audio.play_music("game_theme")
+
+    def handle_events(self, events: list[pygame.event.Event]) -> None:
+        for event in events:
+            if event.type != pygame.KEYDOWN:
+                continue
+            if event.key == self.app.key("back"):
+                self.app.change_scene("menu")
+            elif event.key == self.app.key("retry_ready") and self.game.game_over:
+                self.on_enter()
+            elif self.game.game_over:
+                continue
+            elif event.key == self.app.key("move_left"):
+                if self.game.move(-1, 0):
+                    self.app.audio.play_sfx(sfx.MOVE)
+            elif event.key == self.app.key("move_right"):
+                if self.game.move(1, 0):
+                    self.app.audio.play_sfx(sfx.MOVE)
+            elif event.key == self.app.key("soft_drop"):
+                self.after_step(self.game.soft_drop())
+            elif event.key == self.app.key("rotate_cw"):
+                if self.game.rotate(1):
+                    self.app.audio.play_sfx(sfx.ROTATE)
+            elif event.key == self.app.key("rotate_ccw"):
+                if self.game.rotate(-1):
+                    self.app.audio.play_sfx(sfx.ROTATE)
+            elif event.key == self.app.key("rotate_180"):
+                if self.game.rotate(2):
+                    self.app.audio.play_sfx(sfx.ROTATE)
+            elif event.key == self.app.key("hard_drop"):
+                self.after_step(self.game.hard_drop())
+                self.app.audio.play_sfx(sfx.HARD_DROP)
+            elif event.key == self.app.key("hold"):
+                self.game.hold()
+                self.app.audio.play_sfx(sfx.HOLD)
+
+    def update(self, dt: float) -> None:
+        if self.game.game_over:
+            return
+        self.fall_elapsed += dt
+        interval = max(0.12, 0.8 - (self.game.level - 1) * 0.06)
+        if self.fall_elapsed >= interval:
+            self.fall_elapsed = 0.0
+            self.after_step(self.game.tick())
+
+    def after_step(self, result) -> None:
+        if result.lines_cleared:
+            self.app.audio.play_sfx(sfx.LINE_CLEAR)
+        if result.game_over:
+            self.app.audio.play_sfx(sfx.GAME_OVER)
+
+    def draw(self, screen: pygame.Surface) -> None:
+        screen.fill(BLACK)
+        self.draw_text(screen, "Single", (70, 50))
+        draw_tetris_panel(screen, self.font, self.small_font, self.snapshot(), PANEL_X, PANEL_Y, "")
+        self.draw_sidebar(screen)
+        if self.game.game_over:
+            overlay = self.font.render("GAME OVER - Press R", True, WHITE)
+            screen.blit(overlay, overlay.get_rect(center=(480, 360)))
+
+    def snapshot(self) -> dict:
+        grid = [row[:] for row in self.game.board.grid]
+        ghost = self.game.ghost_piece()
+        ghost_cells = []
+        for x, y in ghost.cells:
+            if y >= 0:
+                ghost_cells.append((x, y))
+        for x, y in self.game.current.cells:
+            if y >= 0:
+                grid[y][x] = self.game.current.kind
+        return {
+            "grid": grid,
+            "ghost": ghost_cells,
+            "hold": self.game.hold_piece,
+            "next": self.game.next_pieces,
+        }
+
+    def draw_sidebar(self, screen: pygame.Surface) -> None:
+        self.draw_text(screen, f"Score {self.game.score}", (70, 130), small=True)
+        self.draw_text(screen, f"Lines {self.game.lines}", (70, 165), small=True)
+        self.draw_text(screen, f"Level {self.game.level}", (70, 200), small=True)
+        combo = max(self.game.combo, 0)
+        b2b = "ON" if self.game.back_to_back else "OFF"
+        screen.blit(self.small_font.render(f"Combo Streak {combo}", True, CYAN), (70, 260))
+        screen.blit(self.small_font.render(f"Back-to-Back Bonus {b2b}", True, CYAN), (70, 295))
+        hint = self.small_font.render("Esc: Menu   R: Retry after game over", True, GRAY)
+        screen.blit(hint, (70, 650))

@@ -1,0 +1,5 @@
+{
+  "server_url": "https://python-online-tetris-server.fly.dev",
+  "server_ws_url": "wss://python-online-tetris-server.fly.dev"
+}
+

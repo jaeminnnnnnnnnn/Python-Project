@@ -1,0 +1,6 @@
+MOVE = "move"
+ROTATE = "rotate"
+HARD_DROP = "hard_drop"
+HOLD = "hold"
+LINE_CLEAR = "line_clear"
+GAME_OVER = "game_over"
