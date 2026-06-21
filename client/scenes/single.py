@@ -2,6 +2,7 @@ import pygame
 
 from client.audio import sfx
 from client.constants import BLACK, CYAN, GRAY, WHITE
+from client.game.repeat import GAME_REPEAT, RepeatController
 from client.scenes.base import Scene
 from client.tetris.rules import TetrisGame
 from client.ui.tetris_panel import draw_tetris_panel
@@ -16,14 +17,19 @@ class SingleScene(Scene):
         super().__init__(app)
         self.game = TetrisGame()
         self.fall_elapsed = 0.0
+        self.repeat = RepeatController(GAME_REPEAT)
 
     def on_enter(self) -> None:
         self.game = TetrisGame()
         self.fall_elapsed = 0.0
+        self.repeat.reset()
         self.app.audio.play_music("game_theme")
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
+            if event.type == pygame.KEYUP:
+                self.release_repeat(event.key)
+                continue
             if event.type != pygame.KEYDOWN:
                 continue
             if event.key == self.app.key("back"):
@@ -33,13 +39,14 @@ class SingleScene(Scene):
             elif self.game.game_over:
                 continue
             elif event.key == self.app.key("move_left"):
-                if self.game.move(-1, 0):
-                    self.app.audio.play_sfx(sfx.MOVE)
+                self.repeat.press("move_left")
+                self.apply_action("move_left")
             elif event.key == self.app.key("move_right"):
-                if self.game.move(1, 0):
-                    self.app.audio.play_sfx(sfx.MOVE)
+                self.repeat.press("move_right")
+                self.apply_action("move_right")
             elif event.key == self.app.key("soft_drop"):
-                self.after_step(self.game.soft_drop())
+                self.repeat.press("soft_drop")
+                self.apply_action("soft_drop")
             elif event.key == self.app.key("rotate_cw"):
                 if self.game.rotate(1):
                     self.app.audio.play_sfx(sfx.ROTATE)
@@ -59,11 +66,28 @@ class SingleScene(Scene):
     def update(self, dt: float) -> None:
         if self.game.game_over:
             return
+        for action in self.repeat.update(dt):
+            self.apply_action(action)
         self.fall_elapsed += dt
         interval = max(0.12, 0.8 - (self.game.level - 1) * 0.06)
         if self.fall_elapsed >= interval:
             self.fall_elapsed = 0.0
             self.after_step(self.game.tick())
+
+    def release_repeat(self, key: int) -> None:
+        for action in GAME_REPEAT:
+            if key == self.app.key(action):
+                self.repeat.release(action)
+
+    def apply_action(self, action: str) -> None:
+        if action == "move_left":
+            if self.game.move(-1, 0):
+                self.app.audio.play_sfx(sfx.MOVE)
+        elif action == "move_right":
+            if self.game.move(1, 0):
+                self.app.audio.play_sfx(sfx.MOVE)
+        elif action == "soft_drop":
+            self.after_step(self.game.soft_drop())
 
     def after_step(self, result) -> None:
         if result.lines_cleared:

@@ -4,6 +4,7 @@ import pygame
 
 from client.audio import sfx
 from client.constants import BLACK, CYAN, GRAY, RED, WHITE
+from client.game.repeat import GAME_REPEAT, RepeatController
 from client.match.countdown import Countdown
 from client.net.api import ApiClient, ApiError
 from client.net.websocket import RoomSocketClient
@@ -35,6 +36,7 @@ class OnlineGameScene(Scene):
         self.result: str | None = None
         self.result_sent = False
         self.countdown = Countdown(duration=0.0)
+        self.repeat = RepeatController(GAME_REPEAT)
 
     def on_enter(self) -> None:
         self.game = TetrisGame(seed=self.match_seed())
@@ -45,6 +47,7 @@ class OnlineGameScene(Scene):
         self.result = None
         self.result_sent = False
         self.countdown.reset()
+        self.repeat.reset()
         self.status = "Live match sync"
         self.app.audio.play_music("game_theme")
         self.open_socket()
@@ -71,9 +74,11 @@ class OnlineGameScene(Scene):
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
+            if event.type == pygame.KEYUP:
+                self.release_repeat(event.key)
+                continue
             if event.type != pygame.KEYDOWN:
                 continue
-            changed = False
             if event.key == self.app.key("back"):
                 self.return_to_room()
                 return
@@ -87,45 +92,34 @@ class OnlineGameScene(Scene):
             if self.game.game_over:
                 continue
             if event.key == self.app.key("move_left"):
-                changed = self.game.move(-1, 0)
-                if changed:
-                    self.app.audio.play_sfx(sfx.MOVE)
-                    self.send_input("move_left")
+                self.repeat.press("move_left")
+                self.apply_action("move_left")
             elif event.key == self.app.key("move_right"):
-                changed = self.game.move(1, 0)
-                if changed:
-                    self.app.audio.play_sfx(sfx.MOVE)
-                    self.send_input("move_right")
+                self.repeat.press("move_right")
+                self.apply_action("move_right")
             elif event.key == self.app.key("soft_drop"):
-                result = self.game.soft_drop()
-                self.after_step(result)
-                changed = True
-                self.send_input("soft_drop")
+                self.repeat.press("soft_drop")
+                self.apply_action("soft_drop")
             elif event.key == self.app.key("rotate_cw"):
-                changed = self.game.rotate(1)
-                if changed:
+                if self.game.rotate(1):
                     self.app.audio.play_sfx(sfx.ROTATE)
                     self.send_input("rotate_cw")
             elif event.key == self.app.key("rotate_ccw"):
-                changed = self.game.rotate(-1)
-                if changed:
+                if self.game.rotate(-1):
                     self.app.audio.play_sfx(sfx.ROTATE)
                     self.send_input("rotate_ccw")
             elif event.key == self.app.key("rotate_180"):
-                changed = self.game.rotate(2)
-                if changed:
+                if self.game.rotate(2):
                     self.app.audio.play_sfx(sfx.ROTATE)
                     self.send_input("rotate_180")
             elif event.key == self.app.key("hard_drop"):
                 result = self.game.hard_drop()
                 self.after_step(result)
                 self.app.audio.play_sfx(sfx.HARD_DROP)
-                changed = True
                 self.send_input("hard_drop")
             elif event.key == self.app.key("hold"):
                 self.game.hold()
                 self.app.audio.play_sfx(sfx.HOLD)
-                changed = True
                 self.send_input("hold")
 
     def return_to_room(self) -> None:
@@ -156,6 +150,24 @@ class OnlineGameScene(Scene):
         self.result = None
         self.app.change_scene("online_room")
 
+    def release_repeat(self, key: int) -> None:
+        for action in GAME_REPEAT:
+            if key == self.app.key(action):
+                self.repeat.release(action)
+
+    def apply_action(self, action: str) -> None:
+        if action == "move_left":
+            if self.game.move(-1, 0):
+                self.app.audio.play_sfx(sfx.MOVE)
+                self.send_input(action)
+        elif action == "move_right":
+            if self.game.move(1, 0):
+                self.app.audio.play_sfx(sfx.MOVE)
+                self.send_input(action)
+        elif action == "soft_drop":
+            self.after_step(self.game.soft_drop())
+            self.send_input(action)
+
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
         self.heartbeat_elapsed += dt
@@ -171,6 +183,8 @@ class OnlineGameScene(Scene):
                 self.send_state()
             return
         if not self.game.game_over:
+            for action in self.repeat.update(dt):
+                self.apply_action(action)
             self.fall_elapsed += dt
             interval = max(0.12, 0.8 - (self.game.level - 1) * 0.06)
             if self.fall_elapsed >= interval:
