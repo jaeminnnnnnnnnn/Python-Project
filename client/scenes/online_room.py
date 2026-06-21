@@ -25,20 +25,19 @@ class OnlineRoomScene(Scene):
         self.open_socket()
 
     def on_exit(self) -> None:
-        if self.socket:
-            self.socket.stop()
-            self.socket = None
+        self.socket = None
 
     def open_socket(self) -> None:
         room = self.app.online_room
         if not room:
             return
-        if self.socket and self.socket.room_id == room["id"]:
+        if self.app.online_socket and self.app.online_socket.room_id == room["id"]:
+            self.socket = self.app.online_socket
             return
-        if self.socket:
-            self.socket.stop()
-        self.socket = RoomSocketClient(room["id"])
-        self.socket.start()
+        self.app.close_online_socket()
+        self.app.online_socket = RoomSocketClient(room["id"])
+        self.app.online_socket.start()
+        self.socket = self.app.online_socket
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
@@ -118,6 +117,7 @@ class OnlineRoomScene(Scene):
                 pass
         self.app.online_room = None
         self.app.online_player = None
+        self.app.close_online_socket()
         self.app.change_scene("online_lobby")
 
     def current_player_ready(self) -> bool:

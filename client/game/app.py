@@ -5,6 +5,7 @@ import pygame
 from client import config
 from client.audio.manager import AudioManager
 from client.game.save_data import load_settings
+from client.net.websocket import RoomSocketClient
 from client.scenes.intro import IntroScene
 from client.scenes.menu import MenuScene
 from client.scenes.online_game import OnlineGameScene
@@ -26,6 +27,7 @@ class GameApp:
         self.audio.apply_settings(self.settings)
         self.online_room: dict | None = None
         self.online_player: dict | None = None
+        self.online_socket: RoomSocketClient | None = None
         self.scenes = {
             "intro": IntroScene(self),
             "menu": MenuScene(self),
@@ -43,7 +45,13 @@ class GameApp:
         self.scene.on_enter()
 
     def quit(self) -> None:
+        self.close_online_socket()
         self.running = False
+
+    def close_online_socket(self) -> None:
+        if self.online_socket:
+            self.online_socket.stop()
+            self.online_socket = None
 
     def key(self, action: str) -> int:
         return self.settings.key_bindings[action]

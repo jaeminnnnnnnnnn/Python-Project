@@ -54,16 +54,19 @@ class OnlineGameScene(Scene):
         return room.get("match_seed") if room else None
 
     def on_exit(self) -> None:
-        if self.socket:
-            self.socket.stop()
-            self.socket = None
+        self.socket = None
 
     def open_socket(self) -> None:
         room = self.app.online_room
         if not room:
             return
-        self.socket = RoomSocketClient(room["id"])
-        self.socket.start()
+        if self.app.online_socket and self.app.online_socket.room_id == room["id"]:
+            self.socket = self.app.online_socket
+            return
+        self.app.close_online_socket()
+        self.app.online_socket = RoomSocketClient(room["id"])
+        self.app.online_socket.start()
+        self.socket = self.app.online_socket
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
