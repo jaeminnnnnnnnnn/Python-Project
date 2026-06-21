@@ -19,6 +19,8 @@ class OnlineLobbyScene(Scene):
         super().__init__(app)
         self.api = ApiClient()
         self.refresh_request = BackgroundRequest()
+        self.create_request = BackgroundRequest()
+        self.join_request = BackgroundRequest()
         self.rooms: list[dict] = []
         self.selected = 0
         self.server_online = False
@@ -38,6 +40,8 @@ class OnlineLobbyScene(Scene):
     def on_enter(self) -> None:
         self.mode = "list"
         self.refresh_request = BackgroundRequest()
+        self.create_request = BackgroundRequest()
+        self.join_request = BackgroundRequest()
         self.refresh()
 
     def refresh(self, manual: bool = False) -> None:
@@ -52,6 +56,8 @@ class OnlineLobbyScene(Scene):
 
     def update(self, dt: float) -> None:
         self.apply_refresh_result()
+        self.apply_create_result()
+        self.apply_join_result()
 
     def apply_refresh_result(self) -> None:
         result = self.refresh_request.drain()
@@ -175,19 +181,28 @@ class OnlineLobbyScene(Scene):
             pygame.key.set_text_input_rect(self.password_rect())
 
     def create_room(self) -> None:
+        if self.create_request.running:
+            return
         title = self.create_title.strip() or "Room"
         password = self.create_password.strip() if self.create_password_enabled else None
         if self.create_password_enabled and not password:
             self.status = "Enter a password or turn password Off"
             return
-        try:
-            payload = self.api.create_room(title, password=password)
+        if self.create_request.start(self.api.create_room, title, password=password):
+            self.status = "Creating..."
+
+    def apply_create_result(self) -> None:
+        result = self.create_request.drain()
+        if result is None:
+            return
+        ok, payload = result
+        if ok:
             self.app.online_room = payload["room"]
             self.app.online_player = payload["player"]
             pygame.key.stop_text_input()
             self.app.change_scene("online_room")
-        except ApiError as exc:
-            self.status = f"Create failed: {exc}"
+        else:
+            self.status = "Create failed"
 
     def join_selected_room(self) -> None:
         room = self.rooms[self.selected]
@@ -223,20 +238,31 @@ class OnlineLobbyScene(Scene):
             pygame.key.set_text_input_rect(self.password_rect())
 
     def join_room(self, room: dict, password: str | None) -> None:
-        try:
-            payload = self.api.join_room(room["id"], password=password)
+        if self.join_request.running:
+            return
+        if self.join_request.start(self.api.join_room, room["id"], password=password):
+            self.status = "Joining..."
+
+    def apply_join_result(self) -> None:
+        result = self.join_request.drain()
+        if result is None:
+            return
+        ok, payload = result
+        if ok:
             self.app.online_room = payload["room"]
             self.app.online_player = payload["player"]
             pygame.key.stop_text_input()
             self.app.change_scene("online_room")
-        except ApiError as exc:
-            if "403" in str(exc):
-                self.password_error = "Wrong password"
-                self.join_password = ""
-            elif "409" in str(exc):
-                self.password_error = "Room is full"
-            else:
-                self.password_error = "Join failed"
+            return
+        error = str(payload)
+        if "403" in error:
+            self.password_error = "Wrong password"
+            self.join_password = ""
+        elif "409" in error:
+            self.password_error = "Room is full"
+        else:
+            self.password_error = "Join failed"
+        self.status = JOIN_STATUS if self.mode == "password" else LIST_STATUS
 
     def return_to_list(self) -> None:
         self.mode = "list"

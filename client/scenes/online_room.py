@@ -147,8 +147,9 @@ class OnlineRoomScene(Scene):
         if self.ready_request.running:
             return
         current = self.current_player_ready()
+        self.set_local_ready(not current)
         if self.ready_request.start(self.api.set_ready, room["id"], player["id"], not current):
-            self.status = "Ready..."
+            self.status = "Ready" if not current else "Waiting"
 
     def apply_ready_result(self) -> None:
         result = self.ready_request.drain()
@@ -162,6 +163,20 @@ class OnlineRoomScene(Scene):
             self.status = "Click Ready   Esc Leave"
         else:
             self.status = "Ready failed - press R again"
+            self.refresh()
+
+    def set_local_ready(self, ready: bool) -> None:
+        room = self.app.online_room
+        player = self.app.online_player
+        if not room or not player:
+            return
+        for room_player in room.get("players", []):
+            if room_player.get("id") == player["id"]:
+                room_player["ready"] = ready
+                player["ready"] = ready
+                return
+        room.setdefault("players", []).append({"id": player["id"], "name": player.get("name", "Player"), "ready": ready})
+        player["ready"] = ready
 
     def leave_room(self) -> None:
         room = self.app.online_room
@@ -223,7 +238,7 @@ class OnlineRoomScene(Scene):
             self.draw_text(screen, "Waiting for player...", (120, 525), small=True)
         if room["started"]:
             self.draw_text(screen, "Starting...", (120, 560), small=True)
-        self.draw_button(screen, self.ready_rect(), "Ready", CYAN)
+        self.draw_button(screen, self.ready_rect(), "Waiting" if self.current_player_ready() else "Ready", CYAN)
         self.draw_button(screen, self.leave_rect(), "Leave", GRAY)
         draw_status_bar(screen, self.small_font, self.status)
 

@@ -34,7 +34,9 @@ class RoomStore:
     def set_ready(self, room_id: str, player_id: str, ready: bool) -> Room:
         room = self.get(room_id)
         if player_id not in room.players:
-            raise RoomNotFoundError()
+            if len(room.players) >= room.max_players:
+                raise RoomNotFoundError()
+            room.players[player_id] = Player(id=player_id, name="Player")
         room.touch(player_id)
         room.players[player_id].ready = ready
         if len(room.players) == room.max_players and all(player.ready for player in room.players.values()):

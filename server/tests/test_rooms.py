@@ -63,6 +63,18 @@ def test_heartbeat_keeps_player_in_room() -> None:
     assert first.id in room.last_seen
 
 
+def test_ready_recovers_missing_player_when_room_has_space() -> None:
+    store = RoomStore()
+    room, first = store.create_room("Room", None, "A")
+    room.players.pop(first.id)
+    room.last_seen.pop(first.id)
+
+    room = store.set_ready(room.id, first.id, True)
+
+    assert first.id in room.players
+    assert room.players[first.id].ready
+
+
 def test_room_survives_without_heartbeat() -> None:
     store = RoomStore()
     room, first = store.create_room("Room", None, "A")

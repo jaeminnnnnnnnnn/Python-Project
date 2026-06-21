@@ -57,7 +57,7 @@ class ApiClient:
         if body is not None:
             req.add_header("Content-Type", "application/json")
         try:
-            with request.urlopen(req, timeout=2.0) as response:
+            with request.urlopen(req, timeout=5.0) as response:
                 raw = response.read().decode("utf-8")
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
