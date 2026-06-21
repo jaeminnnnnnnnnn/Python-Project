@@ -37,7 +37,7 @@ class OnlineGameScene(Scene):
         self.status = ""
         self.result: str | None = None
         self.result_sent = False
-        self.countdown = Countdown(duration=0.0)
+        self.countdown = Countdown(duration=3.0)
         self.repeat = RepeatController(GAME_REPEAT)
         self.heartbeat_request = BackgroundRequest()
 
@@ -190,6 +190,10 @@ class OnlineGameScene(Scene):
             return
         if self.countdown.active:
             self.countdown.update(dt)
+            self.send_elapsed += dt
+            if self.send_elapsed >= STATE_SYNC_INTERVAL:
+                self.send_elapsed = 0.0
+                self.send_state()
             if not self.countdown.active:
                 self.status = ""
                 self.send_state()
@@ -366,6 +370,7 @@ class OnlineGameScene(Scene):
             draw_tetris_panel(screen, self.font, self.small_font, remote, RIGHT_PANEL_X, PANEL_Y, self.remote_label(remote_id))
             self.draw_stats(screen, remote, RIGHT_PANEL_X + 88, 616)
         else:
+            remote_id = self.first_remote_player_id()
             empty_state = {"grid": empty_grid(), "ghost": [], "hold": None, "next": []}
             draw_tetris_panel(screen, self.font, self.small_font, empty_state, RIGHT_PANEL_X, PANEL_Y, self.remote_label(remote_id))
 

@@ -24,6 +24,7 @@ class OnlineRoomScene(Scene):
         self.heartbeat_request = BackgroundRequest()
         self.ready_request = BackgroundRequest()
         self.refresh_request = BackgroundRequest()
+        self.pending_ready: bool | None = None
 
     def on_enter(self) -> None:
         self.poll_elapsed = 0.0
@@ -32,6 +33,7 @@ class OnlineRoomScene(Scene):
         self.heartbeat_request = BackgroundRequest()
         self.ready_request = BackgroundRequest()
         self.refresh_request = BackgroundRequest()
+        self.pending_ready = None
         self.refresh()
         self.open_socket()
 
@@ -112,6 +114,7 @@ class OnlineRoomScene(Scene):
         for message in self.socket.drain():
             if message.get("type") == "room.state":
                 self.app.online_room = message["room"]
+                self.apply_pending_ready()
                 self.websocket_failed = False
                 self.status = "Click Ready   Esc Leave"
             else:
@@ -135,6 +138,7 @@ class OnlineRoomScene(Scene):
             room = self.app.online_room
             if room and payload.get("id") == room.get("id"):
                 self.app.online_room = payload
+                self.apply_pending_ready()
             self.status = "Click Ready   Esc Leave"
         else:
             self.status = "Refresh failed"
@@ -147,6 +151,7 @@ class OnlineRoomScene(Scene):
         if self.ready_request.running:
             return
         current = self.current_player_ready()
+        self.pending_ready = not current
         self.set_local_ready(not current)
         if self.ready_request.start(self.api.set_ready, room["id"], player["id"], not current):
             self.status = "Ready" if not current else "Waiting"
@@ -160,8 +165,10 @@ class OnlineRoomScene(Scene):
             room = self.app.online_room
             if room and payload.get("id") == room.get("id"):
                 self.app.online_room = payload
+            self.pending_ready = None
             self.status = "Click Ready   Esc Leave"
         else:
+            self.pending_ready = None
             self.status = "Ready failed - press R again"
             self.refresh()
 
@@ -177,6 +184,10 @@ class OnlineRoomScene(Scene):
                 return
         room.setdefault("players", []).append({"id": player["id"], "name": player.get("name", "Player"), "ready": ready})
         player["ready"] = ready
+
+    def apply_pending_ready(self) -> None:
+        if self.pending_ready is not None:
+            self.set_local_ready(self.pending_ready)
 
     def leave_room(self) -> None:
         room = self.app.online_room
