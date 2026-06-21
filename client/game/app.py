@@ -20,7 +20,6 @@ class GameApp:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
         self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
-        self.canvas = pygame.Surface((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
         self.fullscreen = False
         self.clock = pygame.time.Clock()
         self.running = True
@@ -60,24 +59,8 @@ class GameApp:
 
     def toggle_fullscreen(self) -> None:
         self.fullscreen = not self.fullscreen
-        if self.fullscreen:
-            info = pygame.display.Info()
-            self.screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.NOFRAME)
-        else:
-            self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
-
-    def present(self) -> None:
-        if not self.fullscreen:
-            self.screen.blit(self.canvas, (0, 0))
-            return
-        screen_width, screen_height = self.screen.get_size()
-        scale = min(screen_width / config.WINDOW_WIDTH, screen_height / config.WINDOW_HEIGHT)
-        scaled_size = (int(config.WINDOW_WIDTH * scale), int(config.WINDOW_HEIGHT * scale))
-        scaled = pygame.transform.smoothscale(self.canvas, scaled_size)
-        x = (screen_width - scaled_size[0]) // 2
-        y = (screen_height - scaled_size[1]) // 2
-        self.screen.fill((0, 0, 0))
-        self.screen.blit(scaled, (x, y))
+        flags = pygame.FULLSCREEN | pygame.SCALED if self.fullscreen else 0
+        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT), flags)
 
     def run(self) -> None:
         while self.running:
@@ -91,8 +74,7 @@ class GameApp:
 
             self.scene.handle_events(events)
             self.scene.update(dt)
-            self.scene.draw(self.canvas)
-            self.present()
+            self.scene.draw(self.screen)
             pygame.display.flip()
 
         pygame.quit()
