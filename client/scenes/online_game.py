@@ -17,6 +17,7 @@ from client.ui.tetris_panel import draw_tetris_panel, empty_grid
 LEFT_PANEL_X = 48
 RIGHT_PANEL_X = 496
 PANEL_Y = 130
+STATE_SYNC_INTERVAL = 0.1
 
 
 class OnlineGameScene(Scene):
@@ -147,7 +148,7 @@ class OnlineGameScene(Scene):
                 self.after_step(result)
                 self.send_state()
         self.send_elapsed += dt
-        if self.send_elapsed >= 1.0:
+        if self.send_elapsed >= STATE_SYNC_INTERVAL:
             self.send_elapsed = 0.0
             self.send_state()
 

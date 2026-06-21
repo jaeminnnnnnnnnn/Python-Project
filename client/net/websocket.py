@@ -36,7 +36,21 @@ class RoomSocketClient:
         self._stop.set()
 
     def send(self, message: dict[str, Any]) -> None:
+        if message.get("type") == "match.state":
+            self._drop_queued_match_states()
         self.outgoing.put(message)
+
+    def _drop_queued_match_states(self) -> None:
+        retained: list[dict[str, Any]] = []
+        while True:
+            try:
+                queued = self.outgoing.get_nowait()
+            except Empty:
+                break
+            if queued.get("type") != "match.state":
+                retained.append(queued)
+        for queued in retained:
+            self.outgoing.put(queued)
 
     def drain(self) -> list[dict[str, Any]]:
         drained: list[dict[str, Any]] = []
@@ -72,7 +86,7 @@ class RoomSocketClient:
                             except Empty:
                                 break
                         try:
-                            raw = websocket.recv(timeout=0.2)
+                            raw = websocket.recv(timeout=0.02)
                         except TimeoutError:
                             continue
                         if isinstance(raw, bytes):
