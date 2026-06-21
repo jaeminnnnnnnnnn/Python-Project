@@ -206,10 +206,10 @@ class OnlineGameScene(Scene):
         try:
             self.app.online_room = self.api.heartbeat(room["id"], player["id"])
             if len(self.app.online_room.get("players", [])) < 2 and not self.result:
-                self.status = "Opponent disconnected"
+                self.status = "상대 연결 끊김"
                 self.result = "WIN"
         except ApiError:
-            self.status = "LOADING"
+            self.status = "로딩 중"
 
     def apply_socket_messages(self) -> None:
         if not self.socket:
@@ -250,18 +250,18 @@ class OnlineGameScene(Scene):
             self.result = "LOSE"
             return
         if len(player_ids) < 2 and not self.result:
-            self.status = "Opponent left"
+            self.status = "상대 나감"
             self.result = "WIN"
             self.result_sent = True
             return
         if not room.get("started") and not self.result:
-            self.status = "Match canceled"
+            self.status = "매치 취소"
             self.app.change_scene("online_room")
 
     def after_step(self, result=None) -> None:
         if result and result.attack:
             self.send_garbage(result.attack)
-            self.status = f"Sent {result.attack} garbage"
+            self.status = f"공격 {result.attack}"
         if result and result.lines_cleared:
             self.app.audio.play_sfx(sfx.LINE_CLEAR)
         if result and result.game_over:
@@ -336,7 +336,7 @@ class OnlineGameScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        self.draw_text(screen, "Online Match", (80, 70))
+        self.draw_text(screen, "온라인 매치", (80, 70))
         local_state = self.snapshot()
         draw_tetris_panel(screen, self.font, self.small_font, local_state, LEFT_PANEL_X, PANEL_Y, self.local_label())
         self.draw_stats(screen, local_state, LEFT_PANEL_X + 88, 616)
@@ -364,15 +364,15 @@ class OnlineGameScene(Scene):
         pygame.draw.rect(screen, (28, 32, 40), panel, border_radius=8)
         pygame.draw.rect(screen, CYAN if self.result == "WIN" else RED, panel, width=3, border_radius=8)
 
-        title = "YOU WIN" if self.result == "WIN" else "YOU LOSE"
+        title = "승리" if self.result == "WIN" else "패배"
         title_color = CYAN if self.result == "WIN" else RED
         title_surface = self.font.render(title, True, title_color)
         screen.blit(title_surface, title_surface.get_rect(center=(panel.centerx, panel.y + 72)))
 
-        rematch_surface = self.small_font.render("R REMATCH", True, CYAN)
+        rematch_surface = self.small_font.render("R 재대결", True, CYAN)
         screen.blit(rematch_surface, rematch_surface.get_rect(center=(panel.centerx, panel.y + 188)))
 
-        back_surface = self.small_font.render("ESC ROOM", True, GRAY)
+        back_surface = self.small_font.render("Esc 방으로", True, GRAY)
         screen.blit(back_surface, back_surface.get_rect(center=(panel.centerx, panel.y + 224)))
 
     def first_remote_state(self) -> dict | None:
@@ -396,5 +396,5 @@ class OnlineGameScene(Scene):
 
     def draw_stats(self, screen: pygame.Surface, state: dict, x: int, y: int) -> None:
         color = RED if state.get("game_over") else CYAN
-        text = f"{state['score']}   {state['lines']} L   LV {state['level']}"
+        text = f"{state['score']}   {state['lines']}줄   LV {state['level']}"
         screen.blit(self.small_font.render(text, True, color), (x, y))

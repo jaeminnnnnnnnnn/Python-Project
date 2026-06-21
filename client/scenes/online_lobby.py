@@ -15,12 +15,12 @@ class OnlineLobbyScene(Scene):
         self.server_online = False
         self.loading = False
         self.mode = "list"
-        self.create_title = "Room"
+        self.create_title = "방"
         self.create_password_enabled = False
         self.create_password = ""
         self.create_field = 0
         self.join_password = ""
-        self.status = "R REFRESH   C CREATE   ENTER JOIN   ESC BACK"
+        self.status = "R 새로고침   C 방 만들기   Enter 입장   Esc 뒤로"
 
     def on_enter(self) -> None:
         self.mode = "list"
@@ -28,17 +28,17 @@ class OnlineLobbyScene(Scene):
 
     def refresh(self) -> None:
         self.loading = True
-        self.status = "LOADING"
+        self.status = "로딩 중"
         try:
             self.api.health()
             self.server_online = True
             self.rooms = self.api.list_rooms()
             self.selected = min(self.selected, max(len(self.rooms) - 1, 0))
-            self.status = "R REFRESH   C CREATE   ENTER JOIN   ESC BACK"
+            self.status = "R 새로고침   C 방 만들기   Enter 입장   Esc 뒤로"
         except ApiError:
             self.server_online = False
             self.rooms = []
-            self.status = "R REFRESH   ESC BACK"
+            self.status = "R 새로고침   Esc 뒤로"
         finally:
             self.loading = False
 
@@ -70,16 +70,16 @@ class OnlineLobbyScene(Scene):
 
     def open_create_form(self) -> None:
         self.mode = "create"
-        self.create_title = "Room"
+        self.create_title = "방"
         self.create_password_enabled = False
         self.create_password = ""
         self.create_field = 0
-        self.status = "ENTER CREATE   TAB FIELD   P LOCK   ESC CANCEL"
+        self.status = "Enter 만들기   Tab 항목 이동   P 잠금   Esc 취소"
 
     def handle_create_event(self, event: pygame.event.Event) -> None:
         if event.key == self.app.key("back"):
             self.mode = "list"
-            self.status = "R REFRESH   C CREATE   ENTER JOIN   ESC BACK"
+            self.status = "R 새로고침   C 방 만들기   Enter 입장   Esc 뒤로"
         elif event.key == self.app.key("confirm"):
             self.create_room()
         elif event.key == self.app.key("menu_next"):
@@ -108,10 +108,10 @@ class OnlineLobbyScene(Scene):
             self.create_password += char
 
     def create_room(self) -> None:
-        title = self.create_title.strip() or "Room"
+        title = self.create_title.strip() or "방"
         password = self.create_password if self.create_password_enabled else None
         if self.create_password_enabled and not password:
-            self.status = "PASSWORD EMPTY"
+            self.status = "비밀번호를 입력하세요"
             return
         try:
             payload = self.api.create_room(title, password=password)
@@ -119,14 +119,14 @@ class OnlineLobbyScene(Scene):
             self.app.online_player = payload["player"]
             self.app.change_scene("online_room")
         except ApiError:
-            self.status = "CREATE FAILED"
+            self.status = "방 만들기 실패"
 
     def join_selected_room(self) -> None:
         room = self.rooms[self.selected]
         if room["has_password"]:
             self.mode = "password"
             self.join_password = ""
-            self.status = "ENTER PASSWORD"
+            self.status = "비밀번호 입력"
             return
         self.join_room(room, None)
 
@@ -134,7 +134,7 @@ class OnlineLobbyScene(Scene):
         if event.key == self.app.key("back"):
             self.mode = "list"
             self.join_password = ""
-            self.status = "R REFRESH   C CREATE   ENTER JOIN   ESC BACK"
+            self.status = "R 새로고침   C 방 만들기   Enter 입장   Esc 뒤로"
         elif event.key == self.app.key("confirm"):
             self.join_room(self.rooms[self.selected], self.join_password)
         elif event.key == pygame.K_BACKSPACE:
@@ -149,7 +149,7 @@ class OnlineLobbyScene(Scene):
             self.app.online_player = payload["player"]
             self.app.change_scene("online_room")
         except ApiError:
-            self.status = "JOIN FAILED"
+            self.status = "입장 실패"
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
@@ -159,18 +159,18 @@ class OnlineLobbyScene(Scene):
         if self.mode == "password":
             self.draw_password_form(screen)
             return
-        draw_header(screen, self.font, "Online Lobby")
+        draw_header(screen, self.font, "온라인")
 
         list_rect = pygame.Rect(70, 145, 820, 455)
         draw_panel(screen, list_rect)
         if not self.rooms:
-            message = "LOADING" if self.loading or not self.server_online else "NO ROOMS"
+            message = "로딩 중" if self.loading or not self.server_online else "방 없음"
             surface = self.small_font.render(message, True, WHITE)
             screen.blit(surface, surface.get_rect(center=list_rect.center))
         for index, room in enumerate(self.rooms[:9]):
-            lock = "LOCK" if room["has_password"] else "OPEN"
+            lock = "잠김" if room["has_password"] else "공개"
             players = f"{len(room['players'])}/{room['max_players']}"
-            started = "STARTED" if room["started"] else "WAITING"
+            started = "진행 중" if room["started"] else "대기 중"
             color = CYAN if index == self.selected else WHITE
             row = pygame.Rect(92, 166 + index * 45, 776, 36)
             if index == self.selected:
@@ -183,24 +183,24 @@ class OnlineLobbyScene(Scene):
         draw_status_bar(screen, self.small_font, self.status)
 
     def draw_create_form(self, screen: pygame.Surface) -> None:
-        draw_header(screen, self.font, "Create Room")
+        draw_header(screen, self.font, "방 만들기")
         panel = pygame.Rect(90, 145, 780, 310)
         draw_panel(screen, panel)
         title_color = CYAN if self.create_field == 0 else WHITE
         password_color = CYAN if self.create_field == 1 else WHITE
-        screen.blit(self.font.render(f"Title: {self.create_title}", True, title_color), (125, 185))
-        password_state = "ON" if self.create_password_enabled else "OFF"
-        screen.blit(self.font.render(f"Password: {password_state}", True, WHITE), (125, 250))
+        screen.blit(self.font.render(f"제목: {self.create_title}", True, title_color), (125, 185))
+        password_state = "사용" if self.create_password_enabled else "사용 안 함"
+        screen.blit(self.font.render(f"비밀번호: {password_state}", True, WHITE), (125, 250))
         if self.create_password_enabled:
             hidden = "*" * len(self.create_password)
-            screen.blit(self.font.render(f"Code: {hidden}", True, password_color), (125, 315))
+            screen.blit(self.font.render(f"암호: {hidden}", True, password_color), (125, 315))
         draw_status_bar(screen, self.small_font, self.status)
 
     def draw_password_form(self, screen: pygame.Surface) -> None:
         room = self.rooms[self.selected]
-        draw_header(screen, self.font, "Enter Password", room["title"])
+        draw_header(screen, self.font, "비밀번호", room["title"])
         panel = pygame.Rect(90, 165, 780, 210)
         draw_panel(screen, panel)
         hidden = "*" * len(self.join_password)
-        screen.blit(self.font.render(f"Password: {hidden}", True, CYAN), (125, 235))
-        draw_status_bar(screen, self.small_font, "ENTER JOIN   ESC CANCEL")
+        screen.blit(self.font.render(f"암호: {hidden}", True, CYAN), (125, 235))
+        draw_status_bar(screen, self.small_font, "Enter 입장   Esc 취소")

@@ -8,7 +8,7 @@ from client.ui.surface import draw_header, draw_panel, draw_status_bar
 class MenuScene(Scene):
     def __init__(self, app) -> None:
         super().__init__(app)
-        self.items = [("Single", "single"), ("Online", "online_lobby"), ("Options", "options")]
+        self.items = [("싱글", "single"), ("온라인", "online_lobby"), ("설정", "options")]
         self.selected = 0
 
     def on_enter(self) -> None:
@@ -30,11 +30,11 @@ class MenuScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        draw_header(screen, self.font, "GTRIS", "Online Tetris")
+        draw_header(screen, self.font, "GTRIS", "온라인 테트리스")
         for index, (label, _) in enumerate(self.items):
             rect = pygame.Rect(110, 165 + index * 76, 320, 56)
             color = CYAN if index == self.selected else WHITE
             draw_panel(screen, rect, border_color=color if index == self.selected else GRAY)
             surface = self.font.render(label, True, color)
             screen.blit(surface, surface.get_rect(midleft=(rect.x + 28, rect.centery)))
-        draw_status_bar(screen, self.small_font, "ARROWS MOVE   ENTER SELECT   ESC EXIT")
+        draw_status_bar(screen, self.small_font, "방향키 이동   Enter 선택   Esc 종료")

@@ -15,7 +15,7 @@ class OnlineRoomScene(Scene):
     def __init__(self, app) -> None:
         super().__init__(app)
         self.api = ApiClient()
-        self.status = "R READY   ESC LEAVE"
+        self.status = "R 준비   Esc 나가기"
         self.poll_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
         self.socket: RoomSocketClient | None = None
@@ -74,20 +74,20 @@ class OnlineRoomScene(Scene):
         try:
             self.app.online_room = self.api.heartbeat(room["id"], player["id"])
         except ApiError:
-            self.status = "LOADING"
+            self.status = "로딩 중"
 
     def apply_socket_messages(self) -> None:
         if not self.socket:
             return
         for error in self.socket.drain_errors():
             self.websocket_failed = True
-            self.status = "LOADING"
+            self.status = "로딩 중"
         unhandled = []
         for message in self.socket.drain():
             if message.get("type") == "room.state":
                 self.app.online_room = message["room"]
                 self.websocket_failed = False
-                self.status = "R READY   ESC LEAVE"
+                self.status = "R 준비   Esc 나가기"
             else:
                 unhandled.append(message)
         self.socket.put_back(unhandled)
@@ -99,9 +99,9 @@ class OnlineRoomScene(Scene):
             return
         try:
             self.app.online_room = self.api.get_room(room["id"])
-            self.status = "R READY   ESC LEAVE"
+            self.status = "R 준비   Esc 나가기"
         except ApiError:
-            self.status = "LOADING"
+            self.status = "로딩 중"
 
     def toggle_ready(self) -> None:
         room = self.app.online_room
@@ -111,9 +111,9 @@ class OnlineRoomScene(Scene):
         current = self.current_player_ready()
         try:
             self.app.online_room = self.api.set_ready(room["id"], player["id"], not current)
-            self.status = "R READY   ESC LEAVE"
+            self.status = "R 준비   Esc 나가기"
         except ApiError:
-            self.status = "READY FAILED"
+            self.status = "준비 실패"
 
     def leave_room(self) -> None:
         room = self.app.online_room
@@ -159,7 +159,7 @@ class OnlineRoomScene(Scene):
                 continue
             is_me = room_player["id"] == player["id"]
             name = player_label(room, room_player["id"]) + (" (You)" if is_me else "")
-            ready = "READY" if room_player["ready"] else "WAITING"
+            ready = "준비" if room_player["ready"] else "대기"
             color = CYAN if is_me else WHITE
             screen.blit(self.font.render(name, True, color), (row.x + 28, row.y + 20))
             ready_color = CYAN if room_player["ready"] else GRAY
@@ -167,7 +167,7 @@ class OnlineRoomScene(Scene):
             screen.blit(ready_surface, ready_surface.get_rect(midright=(row.right - 28, row.centery)))
         slots_left = room["max_players"] - len(room["players"])
         if slots_left:
-            self.draw_text(screen, "WAITING", (120, 525), small=True)
+            self.draw_text(screen, "대기 중", (120, 525), small=True)
         if room["started"]:
-            self.draw_text(screen, "STARTING", (120, 560), small=True)
+            self.draw_text(screen, "시작 중", (120, 560), small=True)
         draw_status_bar(screen, self.small_font, self.status)

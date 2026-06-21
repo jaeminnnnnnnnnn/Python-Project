@@ -19,23 +19,22 @@ DEFAULT_KEY_BINDINGS = {
 }
 
 ACTION_LABELS = {
-    "menu_next": "Menu Move",
-    "confirm": "Confirm",
-    "back": "Back",
-    "retry_ready": "Retry / Ready",
-    "move_left": "Move Left",
-    "move_right": "Move Right",
-    "rotate_cw": "Rotate Right",
-    "rotate_ccw": "Rotate Left",
-    "rotate_180": "Rotate 180",
-    "soft_drop": "Soft Drop",
-    "hard_drop": "Hard Drop",
-    "hold": "Hold Piece",
+    "menu_next": "메뉴 이동",
+    "confirm": "선택",
+    "back": "뒤로",
+    "retry_ready": "재시작 / 준비",
+    "move_left": "왼쪽 이동",
+    "move_right": "오른쪽 이동",
+    "rotate_cw": "오른쪽 회전",
+    "rotate_ccw": "왼쪽 회전",
+    "rotate_180": "180도 회전",
+    "soft_drop": "소프트 드롭",
+    "hard_drop": "하드 드롭",
+    "hold": "홀드",
 }
 
 CONTROL_GROUPS = [
-    ("Common", ["menu_next", "confirm", "back", "retry_ready"]),
-    ("Game", ["move_left", "move_right", "rotate_cw", "rotate_ccw", "rotate_180", "soft_drop", "hard_drop", "hold"]),
+    ("게임 조작", ["move_left", "move_right", "rotate_cw", "rotate_ccw", "rotate_180", "soft_drop", "hard_drop", "hold"]),
 ]
 
 

@@ -98,17 +98,17 @@ class SingleScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        self.draw_text(screen, "Single", (70, 50))
+        self.draw_text(screen, "싱글", (70, 50))
         draw_tetris_panel(screen, self.font, self.small_font, self.snapshot(), PANEL_X, PANEL_Y, "")
         self.draw_sidebar(screen)
         if self.game.game_over:
-            overlay = self.font.render("GAME OVER", True, WHITE)
+            overlay = self.font.render("게임 오버", True, WHITE)
             screen.blit(overlay, overlay.get_rect(center=(480, 360)))
 
     def snapshot(self) -> dict:
         return game_snapshot(self.game)
 
     def draw_sidebar(self, screen: pygame.Surface) -> None:
-        self.draw_text(screen, f"Score {self.game.score}", (70, 130), small=True)
-        self.draw_text(screen, f"Lines {self.game.lines}", (70, 165), small=True)
-        self.draw_text(screen, f"Level {self.game.level}", (70, 200), small=True)
+        self.draw_text(screen, f"점수 {self.game.score}", (70, 130), small=True)
+        self.draw_text(screen, f"라인 {self.game.lines}", (70, 165), small=True)
+        self.draw_text(screen, f"레벨 {self.game.level}", (70, 200), small=True)

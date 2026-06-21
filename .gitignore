@@ -21,6 +21,7 @@ server.log
 server.err.log
 
 .env
+settings.json
 
 client/assets/music/
 client/assets/sfx/

@@ -83,27 +83,27 @@ class OptionsScene(Scene):
         if self.mode == "controls":
             self.draw_controls(screen)
             return
-        self.draw_text(screen, "Options", (80, 70))
+        self.draw_text(screen, "설정", (80, 70))
         rows = [
-            ("Background Music", "ON" if self.settings.music_enabled else "OFF"),
-            ("Sound Effects", "ON" if self.settings.sfx_enabled else "OFF"),
-            ("Change Controls", ""),
-            ("Exit Game", ""),
+            ("배경 음악", "켜짐" if self.settings.music_enabled else "꺼짐"),
+            ("효과음", "켜짐" if self.settings.sfx_enabled else "꺼짐"),
+            ("게임 조작키", ""),
+            ("게임 종료", ""),
         ]
         for index, (label, value) in enumerate(rows):
             color = CYAN if index == self.selected else WHITE
             suffix = f": {value}" if value else ""
             surface = self.font.render(f"{'> ' if index == self.selected else '  '}{label}{suffix}", True, color)
             screen.blit(surface, (110, 170 + index * 58))
-        hint = self.small_font.render("Enter: Select   Esc: Back", True, GRAY)
+        hint = self.small_font.render("Enter 선택   Esc 뒤로", True, GRAY)
         screen.blit(hint, (80, 650))
 
     def draw_controls(self, screen: pygame.Surface) -> None:
-        self.draw_text(screen, "Controls", (80, 70))
+        self.draw_text(screen, "게임 조작키", (80, 70))
         if self.waiting_action:
             label = ACTION_LABELS[self.waiting_action]
-            self.draw_text(screen, f"Press a key for {label}", (110, 150), small=True)
-            self.draw_text(screen, "Esc: Cancel", (110, 190), small=True)
+            self.draw_text(screen, f"{label} 키 입력", (110, 150), small=True)
+            self.draw_text(screen, "Esc 취소", (110, 190), small=True)
             return
         y = 125
         for group_name, actions in CONTROL_GROUPS:
@@ -122,5 +122,5 @@ class OptionsScene(Scene):
                 screen.blit(surface, (130, y))
                 y += 34
             y += 10
-        hint = self.small_font.render("Enter: Change   Backspace: Defaults   Esc: Back", True, GRAY)
+        hint = self.small_font.render("Enter 변경   Backspace 기본값   Esc 뒤로", True, GRAY)
         screen.blit(hint, (80, 650))
