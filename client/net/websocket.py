@@ -6,6 +6,7 @@ from threading import Event, Thread
 from typing import Any, Iterable
 import json
 import time
+from urllib.parse import urlencode
 
 from client.config import SERVER_WS_URL
 
@@ -21,6 +22,7 @@ class WebSocketEndpoint:
 @dataclass
 class RoomSocketClient:
     room_id: str
+    player_id: str | None = None
     base_url: str = SERVER_WS_URL
     messages: Queue[dict[str, Any]] = field(default_factory=Queue)
     errors: Queue[str] = field(default_factory=Queue)
@@ -61,7 +63,20 @@ class RoomSocketClient:
             try:
                 drained.append(self.messages.get_nowait())
             except Empty:
-                return drained
+                return self._coalesce_visual_sync_messages(drained)
+
+    def _coalesce_visual_sync_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        latest_indexes: dict[tuple[str, Any], int] = {}
+        stale_indexes: set[int] = set()
+        for index, message in enumerate(messages):
+            if message.get("type") not in VISUAL_SYNC_TYPES:
+                continue
+            key = (str(message.get("type")), message.get("player_id"))
+            previous_index = latest_indexes.get(key)
+            if previous_index is not None:
+                stale_indexes.add(previous_index)
+            latest_indexes[key] = index
+        return [message for index, message in enumerate(messages) if index not in stale_indexes]
 
     def put_back(self, messages: Iterable[dict[str, Any]]) -> None:
         pending = list(messages)
@@ -91,9 +106,18 @@ class RoomSocketClient:
             return
 
         url = f"{self.base_url.rstrip('/')}/ws/rooms/{self.room_id}"
+        if self.player_id:
+            url = f"{url}?{urlencode({'player_id': self.player_id})}"
         while not self._stop.is_set():
             try:
-                with connect(url, open_timeout=10, close_timeout=1, ping_interval=20, ping_timeout=20) as websocket:
+                with connect(
+                    url,
+                    open_timeout=10,
+                    close_timeout=1,
+                    ping_interval=20,
+                    ping_timeout=20,
+                    compression=None,
+                ) as websocket:
                     while not self._stop.is_set():
                         while True:
                             try:

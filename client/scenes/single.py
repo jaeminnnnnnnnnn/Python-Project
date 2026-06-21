@@ -1,7 +1,7 @@
 import pygame
 
 from client.audio import sfx
-from client.constants import BLACK, CYAN, GRAY, WHITE
+from client.constants import BLACK, CYAN, GRAY, RED, WHITE
 from client.game.repeat import GAME_REPEAT, RepeatController
 from client.scenes.base import Scene
 from client.tetris.rules import TetrisGame
@@ -28,6 +28,12 @@ class SingleScene(Scene):
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.game.game_over:
+                if self.retry_rect().collidepoint(event.pos):
+                    self.on_enter()
+                elif self.menu_rect().collidepoint(event.pos):
+                    self.app.change_scene("menu")
+                continue
             if event.type == pygame.KEYUP:
                 self.release_repeat(event.key)
                 continue
@@ -102,8 +108,34 @@ class SingleScene(Scene):
         draw_tetris_panel(screen, self.font, self.small_font, self.snapshot(), PANEL_X, PANEL_Y, "")
         self.draw_sidebar(screen)
         if self.game.game_over:
-            overlay = self.font.render("게임 오버", True, WHITE)
-            screen.blit(overlay, overlay.get_rect(center=(480, 360)))
+            self.draw_game_over(screen)
+
+    def draw_game_over(self, screen: pygame.Surface) -> None:
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 172))
+        screen.blit(overlay, (0, 0))
+
+        panel = pygame.Rect(250, 205, 460, 245)
+        pygame.draw.rect(screen, (28, 32, 40), panel, border_radius=8)
+        pygame.draw.rect(screen, RED, panel, width=3, border_radius=8)
+
+        title_surface = self.font.render("GAME OVER", True, RED)
+        screen.blit(title_surface, title_surface.get_rect(center=(panel.centerx, panel.y + 66)))
+
+        score_surface = self.small_font.render(f"Score {self.game.score}   Lines {self.game.lines}", True, WHITE)
+        screen.blit(score_surface, score_surface.get_rect(center=(panel.centerx, panel.y + 122)))
+
+        retry_surface = self.small_font.render("R Retry", True, CYAN)
+        screen.blit(retry_surface, retry_surface.get_rect(center=(panel.centerx, panel.y + 176)))
+
+        back_surface = self.small_font.render("Esc Menu", True, GRAY)
+        screen.blit(back_surface, back_surface.get_rect(center=(panel.centerx, panel.y + 210)))
+
+    def retry_rect(self) -> pygame.Rect:
+        return pygame.Rect(370, 360, 220, 40)
+
+    def menu_rect(self) -> pygame.Rect:
+        return pygame.Rect(370, 400, 220, 40)
 
     def snapshot(self) -> dict:
         return game_snapshot(self.game)

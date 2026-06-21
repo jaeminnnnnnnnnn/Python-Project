@@ -22,6 +22,12 @@ class OptionsScene(Scene):
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
+            if event.type == pygame.MOUSEMOTION:
+                self.select_at(event.pos)
+                continue
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                self.click_at(event.pos)
+                continue
             if event.type != pygame.KEYDOWN:
                 continue
             if self.waiting_action:
@@ -30,7 +36,7 @@ class OptionsScene(Scene):
             if self.mode == "controls":
                 self.handle_control_event(event)
                 continue
-            if event.key in (self.app.key("menu_next"), pygame.K_DOWN):
+            if event.key in (self.app.key("menu_next"), pygame.K_TAB, pygame.K_DOWN):
                 self.selected = (self.selected + 1) % len(self.items)
             elif event.key == pygame.K_UP:
                 self.selected = (self.selected - 1) % len(self.items)
@@ -50,18 +56,14 @@ class OptionsScene(Scene):
             self.app.quit()
 
     def handle_control_event(self, event: pygame.event.Event) -> None:
-        if event.key in (self.app.key("menu_next"), pygame.K_DOWN):
+        if event.key in (self.app.key("menu_next"), pygame.K_TAB, pygame.K_DOWN):
             self.control_selected = (self.control_selected + 1) % len(self.control_items)
         elif event.key == pygame.K_UP:
             self.control_selected = (self.control_selected - 1) % len(self.control_items)
         elif event.key in (self.app.key("confirm"), pygame.K_RETURN):
             self.waiting_action = self.control_items[self.control_selected]
         elif event.key == pygame.K_BACKSPACE:
-            self.settings.key_bindings = dict(self.app.settings.key_bindings)
-            from client.game.input import DEFAULT_KEY_BINDINGS
-
-            self.settings.key_bindings.update(DEFAULT_KEY_BINDINGS)
-            self.save()
+            self.reset_controls()
         elif event.key in (self.app.key("back"), pygame.K_ESCAPE):
             self.mode = "main"
 
@@ -73,10 +75,66 @@ class OptionsScene(Scene):
         self.waiting_action = None
         self.save()
 
+    def reset_controls(self) -> None:
+        self.settings.key_bindings = dict(self.app.settings.key_bindings)
+        from client.game.input import DEFAULT_KEY_BINDINGS
+
+        self.settings.key_bindings.update(DEFAULT_KEY_BINDINGS)
+        self.save()
+
     def save(self) -> None:
         save_settings(self.settings)
         self.app.settings = self.settings
         self.app.audio.apply_settings(self.settings)
+
+    def select_at(self, pos: tuple[int, int]) -> None:
+        if self.waiting_action:
+            return
+        if self.mode == "controls":
+            for index in range(len(self.control_items)):
+                if self.control_rect(index).collidepoint(pos):
+                    self.control_selected = index
+            return
+        for index in range(len(self.items)):
+            if self.main_rect(index).collidepoint(pos):
+                self.selected = index
+
+    def click_at(self, pos: tuple[int, int]) -> None:
+        if self.waiting_action:
+            return
+        if self.mode == "controls":
+            if self.back_rect().collidepoint(pos):
+                self.mode = "main"
+                return
+            if self.reset_rect().collidepoint(pos):
+                self.reset_controls()
+                return
+            for index in range(len(self.control_items)):
+                if self.control_rect(index).collidepoint(pos):
+                    self.control_selected = index
+                    self.waiting_action = self.control_items[index]
+                    return
+            return
+        if self.back_rect().collidepoint(pos):
+            self.app.change_scene("menu")
+            return
+        for index in range(len(self.items)):
+            if self.main_rect(index).collidepoint(pos):
+                self.selected = index
+                self.activate_main_item()
+                return
+
+    def main_rect(self, index: int) -> pygame.Rect:
+        return pygame.Rect(100, 160 + index * 58, 440, 46)
+
+    def control_rect(self, index: int) -> pygame.Rect:
+        return pygame.Rect(130, 155 + index * 34, 620, 30)
+
+    def back_rect(self) -> pygame.Rect:
+        return pygame.Rect(80, 640, 120, 38)
+
+    def reset_rect(self) -> pygame.Rect:
+        return pygame.Rect(220, 640, 180, 38)
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
@@ -93,17 +151,16 @@ class OptionsScene(Scene):
         for index, (label, value) in enumerate(rows):
             color = CYAN if index == self.selected else WHITE
             suffix = f": {value}" if value else ""
-            surface = self.font.render(f"{'> ' if index == self.selected else '  '}{label}{suffix}", True, color)
+            surface = self.font.render(f"{label}{suffix}", True, color)
             screen.blit(surface, (110, 170 + index * 58))
-        hint = self.small_font.render("Enter 선택   Esc 뒤로", True, GRAY)
-        screen.blit(hint, (80, 650))
+        self.draw_text(screen, "Click an item   Esc Back", (80, 650), small=True)
 
     def draw_controls(self, screen: pygame.Surface) -> None:
         self.draw_text(screen, "Controls", (80, 70))
         if self.waiting_action:
             label = ACTION_LABELS[self.waiting_action]
-            self.draw_text(screen, f"{label} 키 입력", (110, 150), small=True)
-            self.draw_text(screen, "Esc 취소", (110, 190), small=True)
+            self.draw_text(screen, f"Press a key for {label}", (110, 150), small=True)
+            self.draw_text(screen, "Esc Cancel", (110, 190), small=True)
             return
         y = 125
         for group_name, actions in CONTROL_GROUPS:
@@ -114,13 +171,8 @@ class OptionsScene(Scene):
                 color = CYAN if index == self.control_selected else WHITE
                 key_name = pygame.key.name(self.settings.key_bindings[action]).upper()
                 label = ACTION_LABELS[action]
-                surface = self.small_font.render(
-                    f"{'> ' if index == self.control_selected else '  '}{label}: {key_name}",
-                    True,
-                    color,
-                )
+                surface = self.small_font.render(f"{label}: {key_name}", True, color)
                 screen.blit(surface, (130, y))
                 y += 34
             y += 10
-        hint = self.small_font.render("Enter 변경   Backspace 기본값   Esc 뒤로", True, GRAY)
-        screen.blit(hint, (80, 650))
+        self.draw_text(screen, "Click control to change   Backspace Reset   Esc Back", (80, 650), small=True)

@@ -72,12 +72,19 @@ class OnlineGameScene(Scene):
             self.socket = self.app.online_socket
             return
         self.app.close_online_socket()
-        self.app.online_socket = RoomSocketClient(room["id"])
+        player = self.app.online_player
+        self.app.online_socket = RoomSocketClient(room["id"], player_id=player["id"] if player else None)
         self.app.online_socket.start()
         self.socket = self.app.online_socket
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.result and self.rematch_rect().collidepoint(event.pos):
+                    self.ready_for_rematch()
+                elif self.result and self.room_button_rect().collidepoint(event.pos):
+                    self.return_to_room()
+                continue
             if event.type == pygame.KEYUP:
                 self.release_repeat(event.key)
                 continue
@@ -387,6 +394,12 @@ class OnlineGameScene(Scene):
 
         back_surface = self.small_font.render("Esc 방으로", True, GRAY)
         screen.blit(back_surface, back_surface.get_rect(center=(panel.centerx, panel.y + 224)))
+
+    def rematch_rect(self) -> pygame.Rect:
+        return pygame.Rect(370, 360, 220, 40)
+
+    def room_button_rect(self) -> pygame.Rect:
+        return pygame.Rect(370, 400, 220, 40)
 
     def first_remote_state(self) -> dict | None:
         return next(iter(self.remote_states.values()), None)

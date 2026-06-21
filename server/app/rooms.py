@@ -7,7 +7,7 @@ from shared.schemas import Player
 
 
 class RoomStore:
-    stale_timeout_seconds = 15.0
+    stale_timeout_seconds = 60.0
 
     def __init__(self) -> None:
         self.rooms: dict[str, Room] = {}

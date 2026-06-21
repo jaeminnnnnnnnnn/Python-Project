@@ -28,3 +28,19 @@ def test_put_back_preserves_messages_before_existing_queue() -> None:
         {"type": "match.state", "state": {"score": 10}},
         {"type": "room.state"},
     ]
+
+
+def test_drain_drops_stale_visual_messages_per_player() -> None:
+    client = RoomSocketClient("room-1")
+    client.messages.put({"type": "match.state", "player_id": "p1", "state": {"score": 1}})
+    client.messages.put({"type": "match.garbage", "target_id": "p2", "lines": 2})
+    client.messages.put({"type": "match.input", "player_id": "p1", "state": {"score": 2}})
+    client.messages.put({"type": "match.state", "player_id": "p1", "state": {"score": 3}})
+    client.messages.put({"type": "match.state", "player_id": "p2", "state": {"score": 4}})
+
+    assert client.drain() == [
+        {"type": "match.garbage", "target_id": "p2", "lines": 2},
+        {"type": "match.input", "player_id": "p1", "state": {"score": 2}},
+        {"type": "match.state", "player_id": "p1", "state": {"score": 3}},
+        {"type": "match.state", "player_id": "p2", "state": {"score": 4}},
+    ]

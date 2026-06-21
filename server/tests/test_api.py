@@ -132,3 +132,38 @@ def test_room_websocket_broadcasts_garbage_and_result() -> None:
             assert result["type"] == "match.result"
             assert result["winner_id"] == first_id
             assert result["loser_id"] == second_id
+
+
+def test_room_websocket_disconnect_before_match_keeps_player() -> None:
+    created = client.post("/rooms", json={"title": "Room", "player_name": "A"}).json()
+    room_id = created["room"]["id"]
+    first_id = created["player"]["id"]
+    joined = client.post(f"/rooms/{room_id}/join", json={"player_name": "B"}).json()
+    second_id = joined["player"]["id"]
+
+    with client.websocket_connect(f"/ws/rooms/{room_id}?player_id={first_id}") as survivor:
+        survivor.receive_json()
+        with client.websocket_connect(f"/ws/rooms/{room_id}?player_id={second_id}") as leaving:
+            leaving.receive_json()
+
+        room = client.get(f"/rooms/{room_id}").json()
+        assert {player["id"] for player in room["players"]} == {first_id, second_id}
+
+
+def test_room_websocket_disconnect_during_match_removes_player_and_broadcasts_state() -> None:
+    created = client.post("/rooms", json={"title": "Room", "player_name": "A"}).json()
+    room_id = created["room"]["id"]
+    first_id = created["player"]["id"]
+    joined = client.post(f"/rooms/{room_id}/join", json={"player_name": "B"}).json()
+    second_id = joined["player"]["id"]
+    client.post(f"/rooms/{room_id}/ready", json={"player_id": first_id, "ready": True})
+    client.post(f"/rooms/{room_id}/ready", json={"player_id": second_id, "ready": True})
+
+    with client.websocket_connect(f"/ws/rooms/{room_id}?player_id={first_id}") as survivor:
+        survivor.receive_json()
+        with client.websocket_connect(f"/ws/rooms/{room_id}?player_id={second_id}") as leaving:
+            leaving.receive_json()
+
+        updated = survivor.receive_json()
+        assert updated["type"] == "room.state"
+        assert [player["id"] for player in updated["room"]["players"]] == [first_id]

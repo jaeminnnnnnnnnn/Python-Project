@@ -19,8 +19,11 @@ class GameApp:
     def __init__(self) -> None:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
-        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
-        self.fullscreen = False
+        self.fullscreen = True
+        self.screen = pygame.display.set_mode(
+            (config.WINDOW_WIDTH, config.WINDOW_HEIGHT),
+            pygame.FULLSCREEN | pygame.SCALED,
+        )
         self.clock = pygame.time.Clock()
         self.running = True
         self.settings = load_settings()
@@ -39,6 +42,7 @@ class GameApp:
             "options": OptionsScene(self),
         }
         self.scene = self.scenes["intro"]
+        self.scene.on_enter()
 
     def change_scene(self, name: str) -> None:
         self.scene.on_exit()

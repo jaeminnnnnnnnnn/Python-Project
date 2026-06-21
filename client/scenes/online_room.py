@@ -16,7 +16,7 @@ class OnlineRoomScene(Scene):
     def __init__(self, app) -> None:
         super().__init__(app)
         self.api = ApiClient()
-        self.status = "R 준비   Esc 나가기"
+        self.status = "Click Ready   Esc Leave"
         self.poll_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
         self.socket: RoomSocketClient | None = None
@@ -42,17 +42,24 @@ class OnlineRoomScene(Scene):
             self.socket = self.app.online_socket
             return
         self.app.close_online_socket()
-        self.app.online_socket = RoomSocketClient(room["id"])
+        player = self.app.online_player
+        self.app.online_socket = RoomSocketClient(room["id"], player_id=player["id"] if player else None)
         self.app.online_socket.start()
         self.socket = self.app.online_socket
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.ready_rect().collidepoint(event.pos):
+                    self.toggle_ready()
+                elif self.leave_rect().collidepoint(event.pos):
+                    self.leave_room()
+                continue
             if event.type != pygame.KEYDOWN:
                 continue
-            if event.key == self.app.key("back"):
+            if event.key in (self.app.key("back"), pygame.K_ESCAPE):
                 self.leave_room()
-            elif event.key == self.app.key("retry_ready"):
+            elif event.key in (self.app.key("retry_ready"), pygame.K_r, pygame.K_RETURN):
                 self.toggle_ready()
 
     def update(self, dt: float) -> None:
@@ -83,7 +90,7 @@ class OnlineRoomScene(Scene):
             return
         ok, payload = result
         if not ok:
-            self.status = "로딩 중"
+            self.status = "Loading..."
             return
         room = self.app.online_room
         if room and payload.get("id") == room.get("id"):
@@ -92,15 +99,15 @@ class OnlineRoomScene(Scene):
     def apply_socket_messages(self) -> None:
         if not self.socket:
             return
-        for error in self.socket.drain_errors():
+        for _ in self.socket.drain_errors():
             self.websocket_failed = True
-            self.status = "로딩 중"
+            self.status = "Reconnecting..."
         unhandled = []
         for message in self.socket.drain():
             if message.get("type") == "room.state":
                 self.app.online_room = message["room"]
                 self.websocket_failed = False
-                self.status = "R 준비   Esc 나가기"
+                self.status = "Click Ready   Esc Leave"
             else:
                 unhandled.append(message)
         self.socket.put_back(unhandled)
@@ -112,9 +119,9 @@ class OnlineRoomScene(Scene):
             return
         try:
             self.app.online_room = self.api.get_room(room["id"])
-            self.status = "R 준비   Esc 나가기"
+            self.status = "Click Ready   Esc Leave"
         except ApiError:
-            self.status = "로딩 중"
+            self.status = "Loading..."
 
     def toggle_ready(self) -> None:
         room = self.app.online_room
@@ -124,9 +131,9 @@ class OnlineRoomScene(Scene):
         current = self.current_player_ready()
         try:
             self.app.online_room = self.api.set_ready(room["id"], player["id"], not current)
-            self.status = "R 준비   Esc 나가기"
+            self.status = "Click Ready   Esc Leave"
         except ApiError:
-            self.status = "준비 실패"
+            self.status = "Ready failed"
 
     def leave_room(self) -> None:
         room = self.app.online_room
@@ -151,6 +158,12 @@ class OnlineRoomScene(Scene):
                 return bool(room_player["ready"])
         return False
 
+    def ready_rect(self) -> pygame.Rect:
+        return pygame.Rect(610, 540, 120, 44)
+
+    def leave_rect(self) -> pygame.Rect:
+        return pygame.Rect(750, 540, 120, 44)
+
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
         room = self.app.online_room
@@ -170,9 +183,8 @@ class OnlineRoomScene(Scene):
             if not room_player:
                 screen.blit(self.font.render(f"P{index + 1}", True, GRAY), (row.x + 28, row.y + 20))
                 continue
-            is_me = room_player["id"] == player["id"]
             name = player_label(room, room_player["id"]) + (" (You)" if is_me else "")
-            ready = "준비" if room_player["ready"] else "대기"
+            ready = "Ready" if room_player["ready"] else "Waiting"
             color = CYAN if is_me else WHITE
             screen.blit(self.font.render(name, True, color), (row.x + 28, row.y + 20))
             ready_color = CYAN if room_player["ready"] else GRAY
@@ -180,7 +192,14 @@ class OnlineRoomScene(Scene):
             screen.blit(ready_surface, ready_surface.get_rect(midright=(row.right - 28, row.centery)))
         slots_left = room["max_players"] - len(room["players"])
         if slots_left:
-            self.draw_text(screen, "대기 중", (120, 525), small=True)
+            self.draw_text(screen, "Waiting for player...", (120, 525), small=True)
         if room["started"]:
-            self.draw_text(screen, "시작 중", (120, 560), small=True)
+            self.draw_text(screen, "Starting...", (120, 560), small=True)
+        self.draw_button(screen, self.ready_rect(), "Ready", CYAN)
+        self.draw_button(screen, self.leave_rect(), "Leave", GRAY)
         draw_status_bar(screen, self.small_font, self.status)
+
+    def draw_button(self, screen: pygame.Surface, rect: pygame.Rect, label: str, color: tuple[int, int, int]) -> None:
+        draw_panel(screen, rect, border_color=color, fill_color=(24, 28, 35))
+        surface = self.small_font.render(label, True, color)
+        screen.blit(surface, surface.get_rect(center=rect.center))

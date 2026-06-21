@@ -63,6 +63,16 @@ def test_heartbeat_keeps_player_in_room() -> None:
     assert first.id in room.last_seen
 
 
+def test_room_survives_short_listing_gap() -> None:
+    store = RoomStore()
+    room, first = store.create_room("Room", None, "A")
+
+    removed = store.cleanup_stale_players(now=room.last_seen[first.id] + 30.0)
+
+    assert removed == []
+    assert store.list_rooms()[0].id == room.id
+
+
 def test_cleanup_removes_stale_player_and_resets_match() -> None:
     store = RoomStore()
     room, first = store.create_room("Room", None, "A")
