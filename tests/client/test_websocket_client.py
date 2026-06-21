@@ -44,3 +44,20 @@ def test_drain_drops_stale_visual_messages_per_player() -> None:
         {"type": "match.state", "player_id": "p1", "state": {"score": 3}},
         {"type": "match.state", "player_id": "p2", "state": {"score": 4}},
     ]
+
+
+def test_reconnect_sets_reconnect_event() -> None:
+    client = RoomSocketClient("room-1")
+
+    client.reconnect()
+
+    assert client._reconnect.is_set()
+
+
+def test_stop_wakes_reconnect_loop() -> None:
+    client = RoomSocketClient("room-1")
+
+    client.stop()
+
+    assert client._stop.is_set()
+    assert client._reconnect.is_set()

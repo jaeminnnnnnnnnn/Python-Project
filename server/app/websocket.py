@@ -16,11 +16,13 @@ class ConnectionManager:
         self.rooms: dict[str, set[WebSocket]] = defaultdict(set)
         self.socket_players: dict[WebSocket, tuple[str, str | None]] = {}
         self.player_counts: dict[tuple[str, str], int] = defaultdict(int)
+        self.socket_locks: dict[WebSocket, asyncio.Lock] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket, player_id: str | None = None) -> None:
         await websocket.accept()
         self.rooms[room_id].add(websocket)
         self.socket_players[websocket] = (room_id, player_id)
+        self.socket_locks[websocket] = asyncio.Lock()
         if player_id:
             self.player_counts[(room_id, player_id)] += 1
 
@@ -28,6 +30,7 @@ class ConnectionManager:
         self.rooms[room_id].discard(websocket)
         if not self.rooms[room_id]:
             self.rooms.pop(room_id, None)
+        self.socket_locks.pop(websocket, None)
         tracked_room_id, player_id = self.socket_players.pop(websocket, (room_id, None))
         if player_id:
             key = (tracked_room_id, player_id)
@@ -43,13 +46,20 @@ class ConnectionManager:
         if not targets:
             return
         results = await asyncio.gather(
-            *(websocket.send_json(message) for websocket in targets),
+            *(self.send(websocket, message) for websocket in targets),
             return_exceptions=True,
         )
         for websocket, result in zip(targets, results):
             if isinstance(result, Exception):
                 tracked_room_id, player_id = self.socket_players.get(websocket, (room_id, None))
                 await disconnect_room_socket(tracked_room_id, websocket, player_id)
+
+    async def send(self, websocket: WebSocket, message: dict) -> None:
+        lock = self.socket_locks.get(websocket)
+        if lock is None:
+            return
+        async with lock:
+            await websocket.send_json(message)
 
 
 manager = ConnectionManager()

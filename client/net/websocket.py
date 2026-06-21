@@ -28,6 +28,7 @@ class RoomSocketClient:
     errors: Queue[str] = field(default_factory=Queue)
     outgoing: Queue[dict[str, Any]] = field(default_factory=Queue)
     _stop: Event = field(default_factory=Event)
+    _reconnect: Event = field(default_factory=Event)
     _thread: Thread | None = None
 
     def start(self) -> None:
@@ -39,6 +40,10 @@ class RoomSocketClient:
 
     def stop(self) -> None:
         self._stop.set()
+        self._reconnect.set()
+
+    def reconnect(self) -> None:
+        self._reconnect.set()
 
     def send(self, message: dict[str, Any]) -> None:
         if message.get("type") in VISUAL_SYNC_TYPES:
@@ -109,6 +114,7 @@ class RoomSocketClient:
         if self.player_id:
             url = f"{url}?{urlencode({'player_id': self.player_id})}"
         while not self._stop.is_set():
+            self._reconnect.clear()
             try:
                 with connect(
                     url,
@@ -127,7 +133,7 @@ class RoomSocketClient:
                     )
                     sender.start()
                     try:
-                        while not self._stop.is_set() and not connection_stop.is_set():
+                        while not self._stop.is_set() and not self._reconnect.is_set() and not connection_stop.is_set():
                             try:
                                 raw = websocket.recv(timeout=0.05)
                             except TimeoutError:
@@ -143,7 +149,7 @@ class RoomSocketClient:
                     time.sleep(1.0)
 
     def _send_loop(self, websocket: Any, connection_stop: Event) -> None:
-        while not self._stop.is_set() and not connection_stop.is_set():
+        while not self._stop.is_set() and not self._reconnect.is_set() and not connection_stop.is_set():
             try:
                 message = self.outgoing.get(timeout=0.05)
             except Empty:

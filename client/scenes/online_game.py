@@ -22,6 +22,7 @@ RIGHT_PANEL_X = 496
 PANEL_Y = 130
 STATE_SYNC_INTERVAL = 0.10
 HEARTBEAT_INTERVAL = 5.0
+REMOTE_SYNC_STALE_SECONDS = 2.5
 
 
 class OnlineGameScene(Scene):
@@ -34,6 +35,7 @@ class OnlineGameScene(Scene):
         self.fall_elapsed = 0.0
         self.send_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
+        self.remote_sync_elapsed = 0.0
         self.status = ""
         self.result: str | None = None
         self.result_sent = False
@@ -49,6 +51,7 @@ class OnlineGameScene(Scene):
         self.fall_elapsed = 0.0
         self.send_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
+        self.remote_sync_elapsed = 0.0
         self.result = None
         self.result_sent = False
         self.countdown.reset()
@@ -184,6 +187,7 @@ class OnlineGameScene(Scene):
         self.apply_heartbeat_result()
         if self.apply_room_action_results():
             return
+        self.apply_remote_sync_watchdog(dt)
         self.heartbeat_elapsed += dt
         if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
@@ -272,10 +276,12 @@ class OnlineGameScene(Scene):
                 self.apply_room_state(message["room"])
             elif message.get("type") == "match.input" and message.get("player_id") != my_id:
                 self.remote_states[message["player_id"]] = message["state"]
+                self.remote_sync_elapsed = 0.0
                 if message["state"].get("game_over") and not self.game.game_over:
                     self.result = "WIN"
             elif message.get("type") == "match.state" and message.get("player_id") != my_id:
                 self.remote_states[message["player_id"]] = message["state"]
+                self.remote_sync_elapsed = 0.0
                 if message["state"].get("game_over") and not self.game.game_over:
                     self.result = "WIN"
             elif message.get("type") == "match.garbage" and message.get("target_id") == my_id:
@@ -287,6 +293,18 @@ class OnlineGameScene(Scene):
                 self.result = "WIN"
             elif message.get("type") == "match.result" and message.get("loser_id") == my_id:
                 self.result = "LOSE"
+
+    def apply_remote_sync_watchdog(self, dt: float) -> None:
+        if self.result or not self.remote_states:
+            self.remote_sync_elapsed = 0.0
+            return
+        self.remote_sync_elapsed += dt
+        if self.remote_sync_elapsed < REMOTE_SYNC_STALE_SECONDS:
+            return
+        if self.socket:
+            self.socket.reconnect()
+        self.status = "Reconnecting sync..."
+        self.remote_sync_elapsed = 0.0
 
     def apply_room_state(self, room: dict) -> None:
         self.app.online_room = room
