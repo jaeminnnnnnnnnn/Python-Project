@@ -73,15 +73,15 @@ class OnlineRoomScene(Scene):
             return
         try:
             self.app.online_room = self.api.heartbeat(room["id"], player["id"])
-        except ApiError as exc:
-            self.status = f"OFFLINE {exc}"
+        except ApiError:
+            self.status = "LOADING"
 
     def apply_socket_messages(self) -> None:
         if not self.socket:
             return
         for error in self.socket.drain_errors():
             self.websocket_failed = True
-            self.status = f"{error}; polling enabled"
+            self.status = "LOADING"
         unhandled = []
         for message in self.socket.drain():
             if message.get("type") == "room.state":
@@ -100,8 +100,8 @@ class OnlineRoomScene(Scene):
         try:
             self.app.online_room = self.api.get_room(room["id"])
             self.status = "R READY   ESC LEAVE"
-        except ApiError as exc:
-            self.status = f"Refresh failed: {exc}"
+        except ApiError:
+            self.status = "LOADING"
 
     def toggle_ready(self) -> None:
         room = self.app.online_room
@@ -112,8 +112,8 @@ class OnlineRoomScene(Scene):
         try:
             self.app.online_room = self.api.set_ready(room["id"], player["id"], not current)
             self.status = "R READY   ESC LEAVE"
-        except ApiError as exc:
-            self.status = f"READY FAILED {exc}"
+        except ApiError:
+            self.status = "READY FAILED"
 
     def leave_room(self) -> None:
         room = self.app.online_room
@@ -145,7 +145,7 @@ class OnlineRoomScene(Scene):
         if not room or not player:
             self.draw_text(screen, "No room selected", (80, 70))
             return
-        draw_header(screen, self.font, room["title"], f"Room ID: {room['id']}")
+        draw_header(screen, self.font, room["title"])
 
         panel = pygame.Rect(90, 155, 780, 335)
         draw_panel(screen, panel)

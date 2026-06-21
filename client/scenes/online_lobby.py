@@ -13,7 +13,7 @@ class OnlineLobbyScene(Scene):
         self.rooms: list[dict] = []
         self.selected = 0
         self.server_online = False
-        self.server_message = "Checking server..."
+        self.loading = False
         self.mode = "list"
         self.create_title = "Room"
         self.create_password_enabled = False
@@ -27,18 +27,20 @@ class OnlineLobbyScene(Scene):
         self.refresh()
 
     def refresh(self) -> None:
+        self.loading = True
+        self.status = "LOADING"
         try:
             self.api.health()
             self.server_online = True
-            self.server_message = "ONLINE"
             self.rooms = self.api.list_rooms()
             self.selected = min(self.selected, max(len(self.rooms) - 1, 0))
             self.status = "R REFRESH   C CREATE   ENTER JOIN   ESC BACK"
-        except ApiError as exc:
+        except ApiError:
             self.server_online = False
-            self.server_message = "OFFLINE"
             self.rooms = []
-            self.status = f"OFFLINE {exc}"
+            self.status = "R REFRESH   ESC BACK"
+        finally:
+            self.loading = False
 
     def handle_events(self, events: list[pygame.event.Event]) -> None:
         for event in events:
@@ -116,8 +118,8 @@ class OnlineLobbyScene(Scene):
             self.app.online_room = payload["room"]
             self.app.online_player = payload["player"]
             self.app.change_scene("online_room")
-        except ApiError as exc:
-            self.status = f"CREATE FAILED {exc}"
+        except ApiError:
+            self.status = "CREATE FAILED"
 
     def join_selected_room(self) -> None:
         room = self.rooms[self.selected]
@@ -146,8 +148,8 @@ class OnlineLobbyScene(Scene):
             self.app.online_room = payload["room"]
             self.app.online_player = payload["player"]
             self.app.change_scene("online_room")
-        except ApiError as exc:
-            self.status = f"JOIN FAILED {exc}"
+        except ApiError:
+            self.status = "JOIN FAILED"
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
@@ -157,17 +159,12 @@ class OnlineLobbyScene(Scene):
         if self.mode == "password":
             self.draw_password_form(screen)
             return
-        draw_header(screen, self.font, "Online Lobby", self.api.base_url)
-        state_color = CYAN if self.server_online else GRAY
-        state_rect = pygame.Rect(690, 58, 190, 38)
-        draw_panel(screen, state_rect, border_color=state_color)
-        state_surface = self.small_font.render(self.server_message, True, state_color)
-        screen.blit(state_surface, state_surface.get_rect(center=state_rect.center))
+        draw_header(screen, self.font, "Online Lobby")
 
         list_rect = pygame.Rect(70, 145, 820, 455)
         draw_panel(screen, list_rect)
         if not self.rooms:
-            message = "NO ROOMS" if self.server_online else "OFFLINE"
+            message = "LOADING" if self.loading or not self.server_online else "NO ROOMS"
             surface = self.small_font.render(message, True, WHITE)
             screen.blit(surface, surface.get_rect(center=list_rect.center))
         for index, room in enumerate(self.rooms[:9]):

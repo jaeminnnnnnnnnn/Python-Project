@@ -208,8 +208,8 @@ class OnlineGameScene(Scene):
             if len(self.app.online_room.get("players", [])) < 2 and not self.result:
                 self.status = "Opponent disconnected"
                 self.result = "WIN"
-        except ApiError as exc:
-            self.status = f"Heartbeat failed: {exc}"
+        except ApiError:
+            self.status = "LOADING"
 
     def apply_socket_messages(self) -> None:
         if not self.socket:
