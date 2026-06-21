@@ -99,13 +99,15 @@ def test_room_websocket_broadcasts_match_state() -> None:
     room_id = created["room"]["id"]
     player_id = created["player"]["id"]
 
-    with client.websocket_connect(f"/ws/rooms/{room_id}") as websocket:
-        websocket.receive_json()
-        websocket.send_json({"type": "match.state", "player_id": player_id, "state": {"score": 10}})
-        message = websocket.receive_json()
-        assert message["type"] == "match.state"
-        assert message["player_id"] == player_id
-        assert message["state"]["score"] == 10
+    with client.websocket_connect(f"/ws/rooms/{room_id}") as sender:
+        with client.websocket_connect(f"/ws/rooms/{room_id}") as receiver:
+            sender.receive_json()
+            receiver.receive_json()
+            sender.send_json({"type": "match.state", "player_id": player_id, "state": {"score": 10}})
+            message = receiver.receive_json()
+            assert message["type"] == "match.state"
+            assert message["player_id"] == player_id
+            assert message["state"]["score"] == 10
 
 
 def test_room_websocket_broadcasts_garbage_and_result() -> None:
@@ -115,16 +117,18 @@ def test_room_websocket_broadcasts_garbage_and_result() -> None:
     joined = client.post(f"/rooms/{room_id}/join", json={"player_name": "B"}).json()
     second_id = joined["player"]["id"]
 
-    with client.websocket_connect(f"/ws/rooms/{room_id}") as websocket:
-        websocket.receive_json()
-        websocket.send_json({"type": "match.garbage", "player_id": first_id, "target_id": second_id, "lines": 2, "hole": 4})
-        garbage = websocket.receive_json()
-        assert garbage["type"] == "match.garbage"
-        assert garbage["target_id"] == second_id
-        assert garbage["lines"] == 2
+    with client.websocket_connect(f"/ws/rooms/{room_id}") as sender:
+        with client.websocket_connect(f"/ws/rooms/{room_id}") as receiver:
+            sender.receive_json()
+            receiver.receive_json()
+            sender.send_json({"type": "match.garbage", "player_id": first_id, "target_id": second_id, "lines": 2, "hole": 4})
+            garbage = receiver.receive_json()
+            assert garbage["type"] == "match.garbage"
+            assert garbage["target_id"] == second_id
+            assert garbage["lines"] == 2
 
-        websocket.send_json({"type": "match.result", "winner_id": first_id, "loser_id": second_id})
-        result = websocket.receive_json()
-        assert result["type"] == "match.result"
-        assert result["winner_id"] == first_id
-        assert result["loser_id"] == second_id
+            sender.send_json({"type": "match.result", "winner_id": first_id, "loser_id": second_id})
+            result = receiver.receive_json()
+            assert result["type"] == "match.result"
+            assert result["winner_id"] == first_id
+            assert result["loser_id"] == second_id

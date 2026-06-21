@@ -21,8 +21,10 @@ class ConnectionManager:
         if not self.rooms[room_id]:
             self.rooms.pop(room_id, None)
 
-    async def broadcast(self, room_id: str, message: dict) -> None:
+    async def broadcast(self, room_id: str, message: dict, exclude: WebSocket | None = None) -> None:
         for websocket in list(self.rooms.get(room_id, ())):
+            if websocket is exclude:
+                continue
             await websocket.send_json(message)
 
 
@@ -42,7 +44,8 @@ async def room_socket(websocket: WebSocket, room_id: str) -> None:
         await websocket.send_json({"type": "room.state", "room": room.public().model_dump()})
         while True:
             message = await websocket.receive_json()
-            await manager.broadcast(room_id, message)
+            exclude = websocket if str(message.get("type", "")).startswith("match.") else None
+            await manager.broadcast(room_id, message, exclude=exclude)
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
     except Exception:
