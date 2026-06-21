@@ -81,11 +81,15 @@ class OnlineRoomScene(Scene):
         for error in self.socket.drain_errors():
             self.websocket_failed = True
             self.status = f"{error}; polling enabled"
+        unhandled = []
         for message in self.socket.drain():
             if message.get("type") == "room.state":
                 self.app.online_room = message["room"]
                 self.websocket_failed = False
                 self.status = "Live room sync   R: Ready   Esc: Leave"
+            else:
+                unhandled.append(message)
+        self.socket.put_back(unhandled)
 
     def refresh(self) -> None:
         room = self.app.online_room

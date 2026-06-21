@@ -16,3 +16,15 @@ def test_match_state_send_drops_stale_state_messages() -> None:
         {"type": "match.garbage", "lines": 2},
         {"type": "match.state", "state": {"score": 2}},
     ]
+
+
+def test_put_back_preserves_messages_before_existing_queue() -> None:
+    client = RoomSocketClient("room-1")
+    client.messages.put({"type": "room.state"})
+
+    client.put_back([{"type": "match.state", "state": {"score": 10}}])
+
+    assert client.drain() == [
+        {"type": "match.state", "state": {"score": 10}},
+        {"type": "room.state"},
+    ]

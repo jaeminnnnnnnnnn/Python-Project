@@ -17,7 +17,7 @@ from client.ui.tetris_panel import draw_tetris_panel, empty_grid
 LEFT_PANEL_X = 48
 RIGHT_PANEL_X = 496
 PANEL_Y = 130
-STATE_SYNC_INTERVAL = 0.1
+STATE_SYNC_INTERVAL = 0.05
 HEARTBEAT_INTERVAL = 5.0
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from queue import Empty, Queue
 from threading import Event, Thread
-from typing import Any
+from typing import Any, Iterable
 import json
 import time
 
@@ -60,6 +60,18 @@ class RoomSocketClient:
             except Empty:
                 return drained
 
+    def put_back(self, messages: Iterable[dict[str, Any]]) -> None:
+        pending = list(messages)
+        if not pending:
+            return
+        while True:
+            try:
+                pending.append(self.messages.get_nowait())
+            except Empty:
+                break
+        for message in pending:
+            self.messages.put(message)
+
     def drain_errors(self) -> list[str]:
         drained: list[str] = []
         while True:
@@ -86,7 +98,7 @@ class RoomSocketClient:
                             except Empty:
                                 break
                         try:
-                            raw = websocket.recv(timeout=0.02)
+                            raw = websocket.recv(timeout=0.01)
                         except TimeoutError:
                             continue
                         if isinstance(raw, bytes):
