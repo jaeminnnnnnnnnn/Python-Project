@@ -64,19 +64,20 @@ class RoomSocketClient:
         url = f"{self.base_url.rstrip('/')}/ws/rooms/{self.room_id}"
         while not self._stop.is_set():
             try:
-                with connect(url, open_timeout=2, close_timeout=1) as websocket:
+                with connect(url, open_timeout=10, close_timeout=1, ping_interval=20, ping_timeout=20) as websocket:
                     while not self._stop.is_set():
                         while True:
                             try:
                                 websocket.send(json.dumps(self.outgoing.get_nowait()))
                             except Empty:
                                 break
-                        raw = websocket.recv(timeout=0.2)
+                        try:
+                            raw = websocket.recv(timeout=0.2)
+                        except TimeoutError:
+                            continue
                         if isinstance(raw, bytes):
                             raw = raw.decode("utf-8")
                         self.messages.put(json.loads(raw))
-            except TimeoutError:
-                continue
             except Exception as exc:
                 if not self._stop.is_set():
                     self.errors.put(f"websocket disconnected: {exc}")
