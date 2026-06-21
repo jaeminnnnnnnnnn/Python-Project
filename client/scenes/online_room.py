@@ -26,6 +26,7 @@ class OnlineRoomScene(Scene):
         self.refresh_request = BackgroundRequest()
         self.leave_request = BackgroundRequest()
         self.pending_ready: bool | None = None
+        self.preserve_ready_error = False
 
     def on_enter(self) -> None:
         self.poll_elapsed = 0.0
@@ -36,6 +37,7 @@ class OnlineRoomScene(Scene):
         self.refresh_request = BackgroundRequest()
         self.leave_request = BackgroundRequest()
         self.pending_ready = None
+        self.preserve_ready_error = False
         self.refresh()
         self.open_socket()
 
@@ -100,7 +102,7 @@ class OnlineRoomScene(Scene):
             return
         ok, payload = result
         if not ok:
-            self.status = "Loading..."
+            self.status = f"Heartbeat failed: {payload}"
             return
         room = self.app.online_room
         if room and payload.get("id") == room.get("id"):
@@ -129,13 +131,14 @@ class OnlineRoomScene(Scene):
                 unhandled.append(message)
         self.socket.put_back(unhandled)
 
-    def refresh(self) -> None:
+    def refresh(self, update_status: bool = True) -> None:
         room = self.app.online_room
         if not room:
             self.app.change_scene("online_lobby")
             return
         if self.refresh_request.start(self.api.get_room, room["id"]):
-            self.status = "Loading..."
+            if update_status:
+                self.status = "Loading..."
 
     def apply_refresh_result(self) -> None:
         result = self.refresh_request.drain()
@@ -147,9 +150,12 @@ class OnlineRoomScene(Scene):
             if room and payload.get("id") == room.get("id"):
                 self.app.online_room = payload
                 self.apply_pending_ready()
-            self.status = "Click Ready   Esc Leave"
+            if not self.preserve_ready_error:
+                self.status = "Click Ready   Esc Leave"
         else:
-            self.status = "Refresh failed"
+            if not self.preserve_ready_error:
+                self.status = f"Refresh failed: {payload}"
+        self.preserve_ready_error = False
 
     def toggle_ready(self) -> None:
         room = self.app.online_room
@@ -174,11 +180,13 @@ class OnlineRoomScene(Scene):
             if room and payload.get("id") == room.get("id"):
                 self.app.online_room = payload
             self.pending_ready = None
+            self.preserve_ready_error = False
             self.status = "Click Ready   Esc Leave"
         else:
             self.pending_ready = None
-            self.status = "Ready failed - press R again"
-            self.refresh()
+            self.status = f"Ready failed: {payload}"
+            self.preserve_ready_error = True
+            self.refresh(update_status=False)
 
     def set_local_ready(self, ready: bool) -> None:
         room = self.app.online_room

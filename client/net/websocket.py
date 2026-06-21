@@ -118,20 +118,41 @@ class RoomSocketClient:
                     ping_timeout=20,
                     compression=None,
                 ) as websocket:
-                    while not self._stop.is_set():
-                        while True:
+                    connection_stop = Event()
+                    sender = Thread(
+                        target=self._send_loop,
+                        args=(websocket, connection_stop),
+                        name=f"room-ws-send-{self.room_id}",
+                        daemon=True,
+                    )
+                    sender.start()
+                    try:
+                        while not self._stop.is_set() and not connection_stop.is_set():
                             try:
-                                websocket.send(json.dumps(self.outgoing.get_nowait()))
-                            except Empty:
-                                break
-                        try:
-                            raw = websocket.recv(timeout=0.01)
-                        except TimeoutError:
-                            continue
-                        if isinstance(raw, bytes):
-                            raw = raw.decode("utf-8")
-                        self.messages.put(json.loads(raw))
+                                raw = websocket.recv(timeout=0.05)
+                            except TimeoutError:
+                                continue
+                            if isinstance(raw, bytes):
+                                raw = raw.decode("utf-8")
+                            self.messages.put(json.loads(raw))
+                    finally:
+                        connection_stop.set()
             except Exception as exc:
                 if not self._stop.is_set():
                     self.errors.put(f"websocket disconnected: {exc}")
                     time.sleep(1.0)
+
+    def _send_loop(self, websocket: Any, connection_stop: Event) -> None:
+        while not self._stop.is_set() and not connection_stop.is_set():
+            try:
+                message = self.outgoing.get(timeout=0.05)
+            except Empty:
+                continue
+            try:
+                websocket.send(json.dumps(message))
+            except Exception as exc:
+                if not self._stop.is_set() and not connection_stop.is_set():
+                    self.errors.put(f"websocket send failed: {exc}")
+                    connection_stop.set()
+                self.outgoing.put(message)
+                return

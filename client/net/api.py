@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib import error, request
 import json
+import time
 
 from client.config import SERVER_URL
 
@@ -15,13 +16,13 @@ class ApiClient:
     base_url: str = SERVER_URL
 
     def health(self) -> dict[str, Any]:
-        return self._request("GET", "/")
+        return self._request("GET", "/", retries=1)
 
     def list_rooms(self) -> list[dict[str, Any]]:
-        return self._request("GET", "/rooms")
+        return self._request("GET", "/rooms", retries=1)
 
     def get_room(self, room_id: str) -> dict[str, Any]:
-        return self._request("GET", f"/rooms/{room_id}")
+        return self._request("GET", f"/rooms/{room_id}", retries=2)
 
     def create_room(self, title: str, player_name: str = "Player", password: str | None = None) -> dict[str, Any]:
         return self._request(
@@ -38,30 +39,34 @@ class ApiClient:
         )
 
     def set_ready(self, room_id: str, player_id: str, ready: bool) -> dict[str, Any]:
-        return self._request("POST", f"/rooms/{room_id}/ready", {"player_id": player_id, "ready": ready})
+        return self._request("POST", f"/rooms/{room_id}/ready", {"player_id": player_id, "ready": ready}, retries=2)
 
     def leave_room(self, room_id: str, player_id: str) -> dict[str, Any] | None:
-        return self._request("POST", f"/rooms/{room_id}/leave", {"player_id": player_id})
+        return self._request("POST", f"/rooms/{room_id}/leave", {"player_id": player_id}, retries=1)
 
     def reset_room(self, room_id: str, player_id: str) -> dict[str, Any]:
-        return self._request("POST", f"/rooms/{room_id}/reset", {"player_id": player_id})
+        return self._request("POST", f"/rooms/{room_id}/reset", {"player_id": player_id}, retries=1)
 
     def heartbeat(self, room_id: str, player_id: str) -> dict[str, Any]:
-        return self._request("POST", f"/rooms/{room_id}/heartbeat", {"player_id": player_id})
+        return self._request("POST", f"/rooms/{room_id}/heartbeat", {"player_id": player_id}, retries=1)
 
-    def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    def _request(self, method: str, path: str, payload: dict[str, Any] | None = None, retries: int = 0) -> Any:
         url = self.base_url.rstrip("/") + path
         body = None if payload is None else json.dumps(payload).encode("utf-8")
         req = request.Request(url, data=body, method=method)
         req.add_header("Accept", "application/json")
         if body is not None:
             req.add_header("Content-Type", "application/json")
-        try:
-            with request.urlopen(req, timeout=5.0) as response:
-                raw = response.read().decode("utf-8")
-        except error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise ApiError(f"{exc.code}: {detail}") from exc
-        except OSError as exc:
-            raise ApiError("server is not reachable") from exc
+        for attempt in range(retries + 1):
+            try:
+                with request.urlopen(req, timeout=10.0) as response:
+                    raw = response.read().decode("utf-8")
+                break
+            except error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                raise ApiError(f"{exc.code}: {detail}") from exc
+            except OSError as exc:
+                if attempt >= retries:
+                    raise ApiError("server is not reachable") from exc
+                time.sleep(0.25 * (attempt + 1))
         return json.loads(raw) if raw else None

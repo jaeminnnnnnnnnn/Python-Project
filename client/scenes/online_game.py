@@ -6,7 +6,7 @@ from client.audio import sfx
 from client.constants import BLACK, CYAN, GRAY, RED, WHITE
 from client.game.repeat import GAME_REPEAT, RepeatController
 from client.match.countdown import Countdown
-from client.net.api import ApiClient, ApiError
+from client.net.api import ApiClient
 from client.net.background import BackgroundRequest
 from client.net.websocket import RoomSocketClient
 from client.player_labels import player_label
@@ -40,6 +40,8 @@ class OnlineGameScene(Scene):
         self.countdown = Countdown(duration=3.0)
         self.repeat = RepeatController(GAME_REPEAT)
         self.heartbeat_request = BackgroundRequest()
+        self.reset_request = BackgroundRequest()
+        self.rematch_request = BackgroundRequest()
 
     def on_enter(self) -> None:
         self.game = TetrisGame(seed=self.match_seed())
@@ -52,6 +54,8 @@ class OnlineGameScene(Scene):
         self.countdown.reset()
         self.repeat.reset()
         self.heartbeat_request = BackgroundRequest()
+        self.reset_request = BackgroundRequest()
+        self.rematch_request = BackgroundRequest()
         self.status = ""
         self.app.audio.play_music("game_theme")
         self.open_socket()
@@ -136,13 +140,11 @@ class OnlineGameScene(Scene):
     def return_to_room(self) -> None:
         room = self.app.online_room
         player = self.app.online_player
-        if room and player:
-            try:
-                self.app.online_room = self.api.reset_room(room["id"], player["id"])
-            except ApiError as exc:
-                self.status = f"Room reset failed: {exc}"
-                return
-        self.app.change_scene("online_room")
+        if not room or not player:
+            self.app.change_scene("online_room")
+            return
+        if self.reset_request.start(self.api.reset_room, room["id"], player["id"]):
+            self.status = "Returning to room..."
 
     def ready_for_rematch(self) -> None:
         room = self.app.online_room
@@ -150,16 +152,14 @@ class OnlineGameScene(Scene):
         if not room or not player:
             self.app.change_scene("online_room")
             return
-        try:
-            latest = self.api.get_room(room["id"])
-            if latest.get("started"):
-                latest = self.api.reset_room(room["id"], player["id"])
-            self.app.online_room = self.api.set_ready(room["id"], player["id"], True)
-        except ApiError as exc:
-            self.status = f"Rematch failed: {exc}"
-            return
-        self.result = None
-        self.app.change_scene("online_room")
+        if self.rematch_request.start(self.prepare_rematch, room["id"], player["id"]):
+            self.status = "Preparing rematch..."
+
+    def prepare_rematch(self, room_id: str, player_id: str) -> dict:
+        latest = self.api.get_room(room_id)
+        if latest.get("started"):
+            self.api.reset_room(room_id, player_id)
+        return self.api.set_ready(room_id, player_id, True)
 
     def release_repeat(self, key: int) -> None:
         for action in GAME_REPEAT:
@@ -182,10 +182,14 @@ class OnlineGameScene(Scene):
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
         self.apply_heartbeat_result()
+        if self.apply_room_action_results():
+            return
         self.heartbeat_elapsed += dt
         if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
             self.send_heartbeat()
+        if self.reset_request.running or self.rematch_request.running:
+            return
         if self.result:
             return
         if self.countdown.active:
@@ -234,6 +238,27 @@ class OnlineGameScene(Scene):
             if len(payload.get("players", [])) < 2 and not self.result:
                 self.status = "상대 연결 끊김"
                 self.result = "WIN"
+
+    def apply_room_action_results(self) -> bool:
+        reset_result = self.reset_request.drain()
+        if reset_result is not None:
+            ok, payload = reset_result
+            if ok:
+                self.app.online_room = payload
+                self.app.change_scene("online_room")
+                return True
+            self.status = f"Room reset failed: {payload}"
+
+        rematch_result = self.rematch_request.drain()
+        if rematch_result is not None:
+            ok, payload = rematch_result
+            if ok:
+                self.app.online_room = payload
+                self.result = None
+                self.app.change_scene("online_room")
+                return True
+            self.status = f"Rematch failed: {payload}"
+        return False
 
     def apply_socket_messages(self) -> None:
         if not self.socket:

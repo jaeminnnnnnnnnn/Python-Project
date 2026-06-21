@@ -39,10 +39,17 @@ class ConnectionManager:
         return self.player_counts.get((room_id, player_id), 0) > 0
 
     async def broadcast(self, room_id: str, message: dict, exclude: WebSocket | None = None) -> None:
-        for websocket in list(self.rooms.get(room_id, ())):
-            if websocket is exclude:
-                continue
-            await websocket.send_json(message)
+        targets = [websocket for websocket in list(self.rooms.get(room_id, ())) if websocket is not exclude]
+        if not targets:
+            return
+        results = await asyncio.gather(
+            *(websocket.send_json(message) for websocket in targets),
+            return_exceptions=True,
+        )
+        for websocket, result in zip(targets, results):
+            if isinstance(result, Exception):
+                tracked_room_id, player_id = self.socket_players.get(websocket, (room_id, None))
+                await disconnect_room_socket(tracked_room_id, websocket, player_id)
 
 
 manager = ConnectionManager()
