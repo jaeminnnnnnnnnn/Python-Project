@@ -5,6 +5,7 @@ from client.net.api import ApiClient, ApiError
 from client.net.websocket import RoomSocketClient
 from client.player_labels import player_label
 from client.scenes.base import Scene
+from client.ui.surface import draw_header, draw_panel, draw_status_bar
 
 
 HEARTBEAT_INTERVAL = 5.0
@@ -144,18 +145,30 @@ class OnlineRoomScene(Scene):
         if not room or not player:
             self.draw_text(screen, "No room selected", (80, 70))
             return
-        self.draw_text(screen, room["title"], (80, 70))
-        self.draw_text(screen, f"Room ID: {room['id']}", (84, 120), small=True)
-        for index, room_player in enumerate(room["players"]):
+        draw_header(screen, self.font, room["title"], f"Room ID: {room['id']}")
+
+        panel = pygame.Rect(90, 155, 780, 335)
+        draw_panel(screen, panel)
+        for index in range(room["max_players"]):
+            room_player = room["players"][index] if index < len(room["players"]) else None
+            row = pygame.Rect(120, 190 + index * 108, 720, 78)
+            is_me = bool(room_player and room_player["id"] == player["id"])
+            draw_panel(screen, row, border_color=CYAN if is_me else GRAY, fill_color=(32, 42, 48) if is_me else (28, 32, 40))
+            if not room_player:
+                screen.blit(self.font.render(f"P{index + 1}", True, GRAY), (row.x + 28, row.y + 20))
+                screen.blit(self.small_font.render("Waiting for player", True, GRAY), (row.x + 120, row.y + 28))
+                continue
             is_me = room_player["id"] == player["id"]
             name = player_label(room, room_player["id"]) + (" (You)" if is_me else "")
             ready = "READY" if room_player["ready"] else "WAITING"
             color = CYAN if is_me else WHITE
-            screen.blit(self.font.render(f"{name}: {ready}", True, color), (110, 190 + index * 58))
+            screen.blit(self.font.render(name, True, color), (row.x + 28, row.y + 20))
+            ready_color = CYAN if room_player["ready"] else GRAY
+            ready_surface = self.font.render(ready, True, ready_color)
+            screen.blit(ready_surface, ready_surface.get_rect(midright=(row.right - 28, row.centery)))
         slots_left = room["max_players"] - len(room["players"])
         if slots_left:
-            self.draw_text(screen, "Waiting for another player...", (110, 330), small=True)
+            self.draw_text(screen, "Waiting for another player...", (120, 525), small=True)
         if room["started"]:
-            self.draw_text(screen, "Match starting...", (110, 390), small=True)
-        hint = self.small_font.render(self.status, True, GRAY)
-        screen.blit(hint, (80, 650))
+            self.draw_text(screen, "Match starting...", (120, 560), small=True)
+        draw_status_bar(screen, self.small_font, self.status)

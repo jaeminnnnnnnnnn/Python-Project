@@ -3,6 +3,7 @@ import pygame
 from client.constants import BLACK, CYAN, GRAY, WHITE
 from client.net.api import ApiClient, ApiError
 from client.scenes.base import Scene
+from client.ui.surface import draw_header, draw_panel, draw_status_bar
 
 
 class OnlineLobbyScene(Scene):
@@ -156,42 +157,53 @@ class OnlineLobbyScene(Scene):
         if self.mode == "password":
             self.draw_password_form(screen)
             return
-        self.draw_text(screen, "Online Lobby", (80, 70))
+        draw_header(screen, self.font, "Online Lobby", self.api.base_url)
         state_color = CYAN if self.server_online else GRAY
-        screen.blit(self.small_font.render(self.server_message, True, state_color), (80, 112))
-        screen.blit(self.small_font.render(self.api.base_url, True, GRAY), (80, 615))
+        state_rect = pygame.Rect(690, 58, 190, 38)
+        draw_panel(screen, state_rect, border_color=state_color)
+        state_surface = self.small_font.render(self.server_message, True, state_color)
+        screen.blit(state_surface, state_surface.get_rect(center=state_rect.center))
+
+        list_rect = pygame.Rect(70, 145, 820, 455)
+        draw_panel(screen, list_rect)
         if not self.rooms:
             message = "No rooms. Press C to create one." if self.server_online else "Server is not reachable."
-            self.draw_text(screen, message, (90, 160), small=True)
+            surface = self.small_font.render(message, True, WHITE)
+            screen.blit(surface, surface.get_rect(center=list_rect.center))
         for index, room in enumerate(self.rooms[:9]):
-            marker = "> " if index == self.selected else "  "
             lock = "LOCK" if room["has_password"] else "OPEN"
             players = f"{len(room['players'])}/{room['max_players']}"
             started = "STARTED" if room["started"] else "WAITING"
             color = CYAN if index == self.selected else WHITE
-            text = f"{marker}{room['title']}  [{lock}]  {players}  {started}"
-            screen.blit(self.small_font.render(text, True, color), (90, 145 + index * 36))
-        hint = self.small_font.render(self.status, True, GRAY)
-        screen.blit(hint, (80, 650))
+            row = pygame.Rect(92, 166 + index * 45, 776, 36)
+            if index == self.selected:
+                draw_panel(screen, row, border_color=CYAN, fill_color=(32, 42, 48))
+            title = self.small_font.render(room["title"], True, color)
+            screen.blit(title, (row.x + 16, row.y + 7))
+            screen.blit(self.small_font.render(lock, True, color), (row.x + 390, row.y + 7))
+            screen.blit(self.small_font.render(players, True, color), (row.x + 500, row.y + 7))
+            screen.blit(self.small_font.render(started, True, color), (row.x + 610, row.y + 7))
+        draw_status_bar(screen, self.small_font, self.status)
 
     def draw_create_form(self, screen: pygame.Surface) -> None:
-        self.draw_text(screen, "Create Room", (80, 70))
+        draw_header(screen, self.font, "Create Room")
+        panel = pygame.Rect(90, 145, 780, 310)
+        draw_panel(screen, panel)
         title_color = CYAN if self.create_field == 0 else WHITE
         password_color = CYAN if self.create_field == 1 else WHITE
-        screen.blit(self.font.render(f"Title: {self.create_title}", True, title_color), (110, 165))
+        screen.blit(self.font.render(f"Title: {self.create_title}", True, title_color), (125, 185))
         password_state = "ON" if self.create_password_enabled else "OFF"
-        screen.blit(self.font.render(f"Password: {password_state}", True, WHITE), (110, 230))
+        screen.blit(self.font.render(f"Password: {password_state}", True, WHITE), (125, 250))
         if self.create_password_enabled:
             hidden = "*" * len(self.create_password)
-            screen.blit(self.font.render(f"Code: {hidden}", True, password_color), (110, 295))
-        hint = self.small_font.render(self.status, True, GRAY)
-        screen.blit(hint, (80, 650))
+            screen.blit(self.font.render(f"Code: {hidden}", True, password_color), (125, 315))
+        draw_status_bar(screen, self.small_font, self.status)
 
     def draw_password_form(self, screen: pygame.Surface) -> None:
         room = self.rooms[self.selected]
-        self.draw_text(screen, "Enter Password", (80, 70))
-        self.draw_text(screen, room["title"], (110, 145), small=True)
+        draw_header(screen, self.font, "Enter Password", room["title"])
+        panel = pygame.Rect(90, 165, 780, 210)
+        draw_panel(screen, panel)
         hidden = "*" * len(self.join_password)
-        screen.blit(self.font.render(f"Password: {hidden}", True, CYAN), (110, 215))
-        hint = self.small_font.render("Enter: Join   Esc: Cancel", True, GRAY)
-        screen.blit(hint, (80, 650))
+        screen.blit(self.font.render(f"Password: {hidden}", True, CYAN), (125, 235))
+        draw_status_bar(screen, self.small_font, "Enter: Join   Esc: Cancel")

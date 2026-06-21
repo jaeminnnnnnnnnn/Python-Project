@@ -2,6 +2,7 @@ import pygame
 
 from client.constants import BLACK, CYAN, GRAY, WHITE
 from client.scenes.base import Scene
+from client.ui.surface import draw_header, draw_panel, draw_status_bar
 
 
 class MenuScene(Scene):
@@ -29,11 +30,11 @@ class MenuScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        self.draw_text(screen, "Menu", (80, 70))
+        draw_header(screen, self.font, "GTRIS", "Online Tetris")
         for index, (label, _) in enumerate(self.items):
+            rect = pygame.Rect(110, 165 + index * 76, 320, 56)
             color = CYAN if index == self.selected else WHITE
-            prefix = "> " if index == self.selected else "  "
-            surface = self.font.render(prefix + label, True, color)
-            screen.blit(surface, (110, 160 + index * 58))
-        hint = self.small_font.render("Tab/Arrow: Move   Enter: Select   Esc: Exit", True, GRAY)
-        screen.blit(hint, (80, 650))
+            draw_panel(screen, rect, border_color=color if index == self.selected else GRAY)
+            surface = self.font.render(label, True, color)
+            screen.blit(surface, surface.get_rect(midleft=(rect.x + 28, rect.centery)))
+        draw_status_bar(screen, self.small_font, "Tab/Arrow: Move   Enter: Select   Esc: Exit")
