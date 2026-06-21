@@ -10,6 +10,9 @@ import time
 from client.config import SERVER_WS_URL
 
 
+VISUAL_SYNC_TYPES = {"match.input", "match.state"}
+
+
 @dataclass(frozen=True)
 class WebSocketEndpoint:
     url: str
@@ -36,18 +39,18 @@ class RoomSocketClient:
         self._stop.set()
 
     def send(self, message: dict[str, Any]) -> None:
-        if message.get("type") == "match.state":
-            self._drop_queued_match_states()
+        if message.get("type") in VISUAL_SYNC_TYPES:
+            self._drop_queued_visual_sync_messages()
         self.outgoing.put(message)
 
-    def _drop_queued_match_states(self) -> None:
+    def _drop_queued_visual_sync_messages(self) -> None:
         retained: list[dict[str, Any]] = []
         while True:
             try:
                 queued = self.outgoing.get_nowait()
             except Empty:
                 break
-            if queued.get("type") != "match.state":
+            if queued.get("type") not in VISUAL_SYNC_TYPES:
                 retained.append(queued)
         for queued in retained:
             self.outgoing.put(queued)

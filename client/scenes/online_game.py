@@ -17,7 +17,7 @@ from client.ui.tetris_panel import draw_tetris_panel, empty_grid
 LEFT_PANEL_X = 48
 RIGHT_PANEL_X = 496
 PANEL_Y = 130
-STATE_SYNC_INTERVAL = 0.05
+STATE_SYNC_INTERVAL = 0.25
 HEARTBEAT_INTERVAL = 5.0
 
 
@@ -88,37 +88,43 @@ class OnlineGameScene(Scene):
                 changed = self.game.move(-1, 0)
                 if changed:
                     self.app.audio.play_sfx(sfx.MOVE)
+                    self.send_input("move_left")
             elif event.key == self.app.key("move_right"):
                 changed = self.game.move(1, 0)
                 if changed:
                     self.app.audio.play_sfx(sfx.MOVE)
+                    self.send_input("move_right")
             elif event.key == self.app.key("soft_drop"):
                 result = self.game.soft_drop()
                 self.after_step(result)
                 changed = True
+                self.send_input("soft_drop")
             elif event.key == self.app.key("rotate_cw"):
                 changed = self.game.rotate(1)
                 if changed:
                     self.app.audio.play_sfx(sfx.ROTATE)
+                    self.send_input("rotate_cw")
             elif event.key == self.app.key("rotate_ccw"):
                 changed = self.game.rotate(-1)
                 if changed:
                     self.app.audio.play_sfx(sfx.ROTATE)
+                    self.send_input("rotate_ccw")
             elif event.key == self.app.key("rotate_180"):
                 changed = self.game.rotate(2)
                 if changed:
                     self.app.audio.play_sfx(sfx.ROTATE)
+                    self.send_input("rotate_180")
             elif event.key == self.app.key("hard_drop"):
                 result = self.game.hard_drop()
                 self.after_step(result)
                 self.app.audio.play_sfx(sfx.HARD_DROP)
                 changed = True
+                self.send_input("hard_drop")
             elif event.key == self.app.key("hold"):
                 self.game.hold()
                 self.app.audio.play_sfx(sfx.HOLD)
                 changed = True
-            if changed:
-                self.send_state()
+                self.send_input("hold")
 
     def return_to_room(self) -> None:
         room = self.app.online_room
@@ -179,6 +185,10 @@ class OnlineGameScene(Scene):
         for message in self.socket.drain():
             if message.get("type") == "room.state":
                 self.apply_room_state(message["room"])
+            elif message.get("type") == "match.input" and message.get("player_id") != my_id:
+                self.remote_states[message["player_id"]] = message["state"]
+                if message["state"].get("game_over") and not self.game.game_over:
+                    self.result = "WIN"
             elif message.get("type") == "match.state" and message.get("player_id") != my_id:
                 self.remote_states[message["player_id"]] = message["state"]
                 if message["state"].get("game_over") and not self.game.game_over:
@@ -229,6 +239,18 @@ class OnlineGameScene(Scene):
             {
                 "type": "match.state",
                 "player_id": self.app.online_player["id"],
+                "state": self.snapshot(),
+            }
+        )
+
+    def send_input(self, action: str) -> None:
+        if not self.socket or not self.app.online_player:
+            return
+        self.socket.send(
+            {
+                "type": "match.input",
+                "player_id": self.app.online_player["id"],
+                "action": action,
                 "state": self.snapshot(),
             }
         )
