@@ -13,15 +13,17 @@ def test_create_and_join_room() -> None:
     assert len(room.players) == 2
 
 
-def test_owner_leave_removes_room() -> None:
+def test_owner_leave_keeps_room_when_other_player_remains() -> None:
     store = RoomStore()
     room, first = store.create_room("Room", None, "A")
-    store.join_room(room.id, "B", None)
+    _, second = store.join_room(room.id, "B", None)
 
     result = store.leave_room(room.id, first.id)
 
-    assert result is None
-    assert room.id not in store.rooms
+    assert result is room
+    assert first.id not in room.players
+    assert second.id in room.players
+    assert room.id in store.rooms
 
 
 def test_non_owner_leave_keeps_room() -> None:
@@ -35,6 +37,16 @@ def test_non_owner_leave_keeps_room() -> None:
     assert first.id in room.players
     assert second.id not in room.players
     assert room.id in store.rooms
+
+
+def test_room_is_removed_when_last_player_leaves() -> None:
+    store = RoomStore()
+    room, first = store.create_room("Room", None, "A")
+
+    result = store.leave_room(room.id, first.id)
+
+    assert result is None
+    assert room.id not in store.rooms
 
 
 def test_password_room_rejects_wrong_password() -> None:

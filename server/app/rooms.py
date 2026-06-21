@@ -45,11 +45,8 @@ class RoomStore:
                 room.start_match()
         return room
 
-    def leave_room(self, room_id: str, player_id: str, remove_owner_room: bool = True) -> Room | None:
+    def leave_room(self, room_id: str, player_id: str) -> Room | None:
         room = self.get(room_id)
-        if remove_owner_room and player_id == room.owner_id:
-            self.rooms.pop(room_id, None)
-            return None
         room.players.pop(player_id, None)
         room.last_seen.pop(player_id, None)
         room.started = False

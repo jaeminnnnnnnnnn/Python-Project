@@ -41,11 +41,25 @@ def test_room_api_flow() -> None:
     assert not room["started"]
 
 
-def test_owner_leave_api_removes_room() -> None:
+def test_owner_leave_api_keeps_room_when_other_player_remains() -> None:
     created = client.post("/rooms", json={"title": "Room", "player_name": "A"}).json()
     room_id = created["room"]["id"]
     first_id = created["player"]["id"]
-    client.post(f"/rooms/{room_id}/join", json={"player_name": "B"})
+    joined = client.post(f"/rooms/{room_id}/join", json={"player_name": "B"}).json()
+    second_id = joined["player"]["id"]
+
+    response = client.post(f"/rooms/{room_id}/leave", json={"player_id": first_id})
+
+    assert response.status_code == 200
+    room = response.json()
+    assert [player["id"] for player in room["players"]] == [second_id]
+    assert client.get("/rooms").json()[0]["id"] == room_id
+
+
+def test_last_player_leave_api_removes_room() -> None:
+    created = client.post("/rooms", json={"title": "Room", "player_name": "A"}).json()
+    room_id = created["room"]["id"]
+    first_id = created["player"]["id"]
 
     response = client.post(f"/rooms/{room_id}/leave", json={"player_id": first_id})
 

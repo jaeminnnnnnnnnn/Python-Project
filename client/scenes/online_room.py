@@ -1,7 +1,7 @@
 import pygame
 
 from client.constants import BLACK, CYAN, GRAY, WHITE
-from client.net.api import ApiClient, ApiError
+from client.net.api import ApiClient
 from client.net.background import BackgroundRequest
 from client.net.websocket import RoomSocketClient
 from client.player_labels import player_label
@@ -24,6 +24,7 @@ class OnlineRoomScene(Scene):
         self.heartbeat_request = BackgroundRequest()
         self.ready_request = BackgroundRequest()
         self.refresh_request = BackgroundRequest()
+        self.leave_request = BackgroundRequest()
         self.pending_ready: bool | None = None
 
     def on_enter(self) -> None:
@@ -33,6 +34,7 @@ class OnlineRoomScene(Scene):
         self.heartbeat_request = BackgroundRequest()
         self.ready_request = BackgroundRequest()
         self.refresh_request = BackgroundRequest()
+        self.leave_request = BackgroundRequest()
         self.pending_ready = None
         self.refresh()
         self.open_socket()
@@ -199,10 +201,7 @@ class OnlineRoomScene(Scene):
         room = self.app.online_room
         player = self.app.online_player
         if room and player:
-            try:
-                self.api.leave_room(room["id"], player["id"])
-            except ApiError:
-                pass
+            self.leave_request.start(self.api.leave_room, room["id"], player["id"])
         self.app.online_room = None
         self.app.online_player = None
         self.app.close_online_socket()

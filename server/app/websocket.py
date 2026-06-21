@@ -65,7 +65,7 @@ async def remove_disconnected_player_after_grace(room_id: str, player_id: str) -
         existing = room_store.get(room_id)
         if not existing.started:
             return
-        room = room_store.leave_room(room_id, player_id, remove_owner_room=False)
+        room = room_store.leave_room(room_id, player_id)
     except RoomNotFoundError:
         return
     if room:
