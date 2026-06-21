@@ -38,6 +38,7 @@ class RoomHeartbeatRequest(BaseModel):
 class RoomPublic(BaseModel):
     id: str
     title: str
+    owner_id: str | None = None
     has_password: bool
     players: list[Player]
     max_players: int = 2

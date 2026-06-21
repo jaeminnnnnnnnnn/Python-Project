@@ -11,6 +11,7 @@ class Room:
     title: str
     password: str | None
     id: str = field(default_factory=lambda: uuid4().hex[:8])
+    owner_id: str | None = None
     players: dict[str, Player] = field(default_factory=dict)
     last_seen: dict[str, float] = field(default_factory=dict)
     max_players: int = 2
@@ -32,6 +33,7 @@ class Room:
         return RoomPublic(
             id=self.id,
             title=self.title,
+            owner_id=self.owner_id,
             has_password=self.has_password,
             players=list(self.players.values()),
             max_players=self.max_players,

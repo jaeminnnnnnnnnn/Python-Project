@@ -9,7 +9,32 @@ def test_create_and_join_room() -> None:
     room, first = store.create_room("Room", None, "A")
     _, second = store.join_room(room.id, "B", None)
     assert first.id != second.id
+    assert room.owner_id == first.id
     assert len(room.players) == 2
+
+
+def test_owner_leave_removes_room() -> None:
+    store = RoomStore()
+    room, first = store.create_room("Room", None, "A")
+    store.join_room(room.id, "B", None)
+
+    result = store.leave_room(room.id, first.id)
+
+    assert result is None
+    assert room.id not in store.rooms
+
+
+def test_non_owner_leave_keeps_room() -> None:
+    store = RoomStore()
+    room, first = store.create_room("Room", None, "A")
+    _, second = store.join_room(room.id, "B", None)
+
+    result = store.leave_room(room.id, second.id)
+
+    assert result is room
+    assert first.id in room.players
+    assert second.id not in room.players
+    assert room.id in store.rooms
 
 
 def test_password_room_rejects_wrong_password() -> None:

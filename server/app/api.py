@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from server.app.state import room_store
-from server.app.websocket import broadcast_room_state
+from server.app.websocket import broadcast_room_closed, broadcast_room_state
 from shared.errors import InvalidPasswordError, RoomFullError, RoomNotFoundError
 from shared.schemas import (
     RoomCreateRequest,
@@ -69,6 +69,8 @@ def leave_room(room_id: str, payload: RoomLeaveRequest, background_tasks: Backgr
         room = room_store.leave_room(room_id, payload.player_id)
         if room:
             background_tasks.add_task(broadcast_room_state, room.id)
+        else:
+            background_tasks.add_task(broadcast_room_closed, room_id)
         return room.public() if room else None
     except RoomNotFoundError as exc:
         raise HTTPException(status_code=404, detail="room not found") from exc

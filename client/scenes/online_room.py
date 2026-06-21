@@ -117,6 +117,12 @@ class OnlineRoomScene(Scene):
                 self.apply_pending_ready()
                 self.websocket_failed = False
                 self.status = "Click Ready   Esc Leave"
+            elif message.get("type") == "room.closed":
+                self.app.online_room = None
+                self.app.online_player = None
+                self.app.close_online_socket()
+                self.app.change_scene("online_lobby")
+                return
             else:
                 unhandled.append(message)
         self.socket.put_back(unhandled)

@@ -53,6 +53,10 @@ async def broadcast_room_state(room_id: str) -> None:
     await manager.broadcast(room_id, {"type": "room.state", "room": room.public().model_dump()})
 
 
+async def broadcast_room_closed(room_id: str) -> None:
+    await manager.broadcast(room_id, {"type": "room.closed", "room_id": room_id})
+
+
 async def remove_disconnected_player_after_grace(room_id: str, player_id: str) -> None:
     await asyncio.sleep(DISCONNECT_GRACE_SECONDS)
     if manager.is_player_connected(room_id, player_id):
@@ -61,7 +65,7 @@ async def remove_disconnected_player_after_grace(room_id: str, player_id: str) -
         existing = room_store.get(room_id)
         if not existing.started:
             return
-        room = room_store.leave_room(room_id, player_id)
+        room = room_store.leave_room(room_id, player_id, remove_owner_room=False)
     except RoomNotFoundError:
         return
     if room:
