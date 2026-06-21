@@ -49,10 +49,13 @@ class TetrisGame:
         to_rotation = candidate.rotation % 4
         for kick_x, kick_y in kicks_for(self.current.kind, from_rotation, to_rotation):
             kicked = candidate.moved(kick_x, -kick_y)
-            if not self.board.collides(kicked):
+            if self.is_visible(kicked) and not self.board.collides(kicked):
                 self.current = kicked
                 return True
         return False
+
+    def is_visible(self, piece: Piece) -> bool:
+        return all(y >= 0 for _, y in piece.cells)
 
     def ghost_piece(self) -> Piece:
         ghost = self.current

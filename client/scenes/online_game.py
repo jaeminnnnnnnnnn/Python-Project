@@ -10,8 +10,9 @@ from client.net.api import ApiClient, ApiError
 from client.net.websocket import RoomSocketClient
 from client.player_labels import player_label
 from client.scenes.base import Scene
-from client.tetris.board import HEIGHT, WIDTH
+from client.tetris.board import WIDTH
 from client.tetris.rules import TetrisGame
+from client.tetris.snapshot import game_snapshot
 from client.ui.tetris_panel import draw_tetris_panel, empty_grid
 
 
@@ -331,27 +332,7 @@ class OnlineGameScene(Scene):
         return None
 
     def snapshot(self) -> dict:
-        grid = [row[:] for row in self.game.board.grid]
-        ghost = self.game.ghost_piece()
-        ghost_cells = []
-        for x, y in ghost.cells:
-            if 0 <= x < WIDTH and 0 <= y < HEIGHT:
-                ghost_cells.append((x, y))
-        for x, y in self.game.current.cells:
-            if 0 <= x < WIDTH and 0 <= y < HEIGHT:
-                grid[y][x] = self.game.current.kind
-        return {
-            "grid": grid,
-            "ghost": ghost_cells,
-            "score": self.game.score,
-            "lines": self.game.lines,
-            "level": self.game.level,
-            "hold": self.game.hold_piece,
-            "next": self.game.next_pieces,
-            "game_over": self.game.game_over,
-            "combo": self.game.combo,
-            "back_to_back": self.game.back_to_back,
-        }
+        return game_snapshot(self.game)
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)

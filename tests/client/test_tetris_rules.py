@@ -61,6 +61,15 @@ def test_srs_rotation_kicks_near_wall() -> None:
     assert not game.board.collides(game.current)
 
 
+def test_rotation_does_not_move_piece_above_visible_board() -> None:
+    game = TetrisGame()
+    game.current = Piece("T", x=4, y=0, rotation=1)
+
+    game.rotate(1)
+
+    assert all(y >= 0 for _, y in game.current.cells)
+
+
 def test_combo_increases_attack_after_consecutive_clears() -> None:
     game = TetrisGame()
     game.combo = 2

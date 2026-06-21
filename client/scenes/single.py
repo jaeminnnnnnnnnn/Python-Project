@@ -5,6 +5,7 @@ from client.constants import BLACK, CYAN, GRAY, WHITE
 from client.game.repeat import GAME_REPEAT, RepeatController
 from client.scenes.base import Scene
 from client.tetris.rules import TetrisGame
+from client.tetris.snapshot import game_snapshot
 from client.ui.tetris_panel import draw_tetris_panel
 
 
@@ -105,21 +106,7 @@ class SingleScene(Scene):
             screen.blit(overlay, overlay.get_rect(center=(480, 360)))
 
     def snapshot(self) -> dict:
-        grid = [row[:] for row in self.game.board.grid]
-        ghost = self.game.ghost_piece()
-        ghost_cells = []
-        for x, y in ghost.cells:
-            if y >= 0:
-                ghost_cells.append((x, y))
-        for x, y in self.game.current.cells:
-            if y >= 0:
-                grid[y][x] = self.game.current.kind
-        return {
-            "grid": grid,
-            "ghost": ghost_cells,
-            "hold": self.game.hold_piece,
-            "next": self.game.next_pieces,
-        }
+        return game_snapshot(self.game)
 
     def draw_sidebar(self, screen: pygame.Surface) -> None:
         self.draw_text(screen, f"Score {self.game.score}", (70, 130), small=True)
