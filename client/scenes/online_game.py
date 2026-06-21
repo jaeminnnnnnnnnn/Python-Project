@@ -78,8 +78,10 @@ class OnlineGameScene(Scene):
                 self.return_to_room()
                 return
             if self.result and event.key == self.app.key("retry_ready"):
-                self.return_to_room()
+                self.ready_for_rematch()
                 return
+            if self.result:
+                continue
             if self.countdown.active:
                 continue
             if self.game.game_over:
@@ -137,12 +139,31 @@ class OnlineGameScene(Scene):
                 return
         self.app.change_scene("online_room")
 
+    def ready_for_rematch(self) -> None:
+        room = self.app.online_room
+        player = self.app.online_player
+        if not room or not player:
+            self.app.change_scene("online_room")
+            return
+        try:
+            latest = self.api.get_room(room["id"])
+            if latest.get("started"):
+                latest = self.api.reset_room(room["id"], player["id"])
+            self.app.online_room = self.api.set_ready(room["id"], player["id"], True)
+        except ApiError as exc:
+            self.status = f"Rematch failed: {exc}"
+            return
+        self.result = None
+        self.app.change_scene("online_room")
+
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
         self.heartbeat_elapsed += dt
         if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
             self.send_heartbeat()
+        if self.result:
+            return
         if self.countdown.active:
             self.countdown.update(dt)
             if not self.countdown.active:
@@ -339,9 +360,7 @@ class OnlineGameScene(Scene):
         if self.game.game_over:
             self.draw_text(screen, "You topped out", (LEFT_PANEL_X + 88, 96), small=True)
         if self.result:
-            result_color = CYAN if self.result == "WIN" else RED
-            surface = self.font.render(self.result, True, result_color)
-            screen.blit(surface, surface.get_rect(center=(480, 72)))
+            self.draw_result_screen(screen)
         elif self.countdown.active:
             surface = self.font.render(self.countdown.label, True, WHITE)
             screen.blit(surface, surface.get_rect(center=(480, 340)))
@@ -350,6 +369,37 @@ class OnlineGameScene(Scene):
         hint_text = "R: Rematch setup   Esc: Back to Room" if self.result else "Esc: Back to Room"
         hint = self.small_font.render(hint_text, True, GRAY)
         screen.blit(hint, (80, 650))
+
+    def draw_result_screen(self, screen: pygame.Surface) -> None:
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 172))
+        screen.blit(overlay, (0, 0))
+
+        panel = pygame.Rect(230, 190, 500, 270)
+        pygame.draw.rect(screen, (28, 32, 40), panel, border_radius=8)
+        pygame.draw.rect(screen, CYAN if self.result == "WIN" else RED, panel, width=3, border_radius=8)
+
+        title = "YOU WIN" if self.result == "WIN" else "YOU LOSE"
+        title_color = CYAN if self.result == "WIN" else RED
+        title_surface = self.font.render(title, True, title_color)
+        screen.blit(title_surface, title_surface.get_rect(center=(panel.centerx, panel.y + 72)))
+
+        reason = self.result_reason()
+        reason_surface = self.small_font.render(reason, True, WHITE)
+        screen.blit(reason_surface, reason_surface.get_rect(center=(panel.centerx, panel.y + 130)))
+
+        rematch_surface = self.small_font.render("R: Ready for rematch", True, CYAN)
+        screen.blit(rematch_surface, rematch_surface.get_rect(center=(panel.centerx, panel.y + 188)))
+
+        back_surface = self.small_font.render("Esc: Back to room", True, GRAY)
+        screen.blit(back_surface, back_surface.get_rect(center=(panel.centerx, panel.y + 224)))
+
+    def result_reason(self) -> str:
+        if self.status in {"Opponent left", "Opponent disconnected"}:
+            return self.status
+        if self.result == "WIN":
+            return "Opponent topped out"
+        return "You topped out"
 
     def first_remote_state(self) -> dict | None:
         return next(iter(self.remote_states.values()), None)
