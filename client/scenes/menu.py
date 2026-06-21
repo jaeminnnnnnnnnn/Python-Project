@@ -8,7 +8,7 @@ from client.ui.surface import draw_header, draw_panel, draw_status_bar
 class MenuScene(Scene):
     def __init__(self, app) -> None:
         super().__init__(app)
-        self.items = [("싱글", "single"), ("온라인", "online_lobby"), ("설정", "options")]
+        self.items = [("Single", "single"), ("Online", "online_lobby"), ("Options", "options")]
         self.selected = 0
 
     def on_enter(self) -> None:
@@ -30,9 +30,9 @@ class MenuScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        draw_header(screen, self.font, "GTRIS", "온라인 테트리스")
+        draw_header(screen, self.font, "GTRIS", "Online Tetris")
         for index, (label, _) in enumerate(self.items):
-            rect = pygame.Rect(110, 165 + index * 76, 320, 56)
+            rect = pygame.Rect(110, 165 + index * 68, 300, 50)
             color = CYAN if index == self.selected else WHITE
             draw_panel(screen, rect, border_color=color if index == self.selected else GRAY)
             surface = self.font.render(label, True, color)

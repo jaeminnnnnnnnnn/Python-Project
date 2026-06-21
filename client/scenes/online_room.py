@@ -2,6 +2,7 @@ import pygame
 
 from client.constants import BLACK, CYAN, GRAY, WHITE
 from client.net.api import ApiClient, ApiError
+from client.net.background import BackgroundRequest
 from client.net.websocket import RoomSocketClient
 from client.player_labels import player_label
 from client.scenes.base import Scene
@@ -20,11 +21,13 @@ class OnlineRoomScene(Scene):
         self.heartbeat_elapsed = 0.0
         self.socket: RoomSocketClient | None = None
         self.websocket_failed = False
+        self.heartbeat_request = BackgroundRequest()
 
     def on_enter(self) -> None:
         self.poll_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
         self.websocket_failed = False
+        self.heartbeat_request = BackgroundRequest()
         self.refresh()
         self.open_socket()
 
@@ -54,6 +57,7 @@ class OnlineRoomScene(Scene):
 
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
+        self.apply_heartbeat_result()
         self.heartbeat_elapsed += dt
         if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
@@ -71,10 +75,19 @@ class OnlineRoomScene(Scene):
         player = self.app.online_player
         if not room or not player:
             return
-        try:
-            self.app.online_room = self.api.heartbeat(room["id"], player["id"])
-        except ApiError:
+        self.heartbeat_request.start(self.api.heartbeat, room["id"], player["id"])
+
+    def apply_heartbeat_result(self) -> None:
+        result = self.heartbeat_request.drain()
+        if result is None:
+            return
+        ok, payload = result
+        if not ok:
             self.status = "로딩 중"
+            return
+        room = self.app.online_room
+        if room and payload.get("id") == room.get("id"):
+            self.app.online_room = payload
 
     def apply_socket_messages(self) -> None:
         if not self.socket:

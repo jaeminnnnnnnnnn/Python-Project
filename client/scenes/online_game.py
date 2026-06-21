@@ -7,6 +7,7 @@ from client.constants import BLACK, CYAN, GRAY, RED, WHITE
 from client.game.repeat import GAME_REPEAT, RepeatController
 from client.match.countdown import Countdown
 from client.net.api import ApiClient, ApiError
+from client.net.background import BackgroundRequest
 from client.net.websocket import RoomSocketClient
 from client.player_labels import player_label
 from client.scenes.base import Scene
@@ -19,7 +20,7 @@ from client.ui.tetris_panel import draw_tetris_panel, empty_grid
 LEFT_PANEL_X = 48
 RIGHT_PANEL_X = 496
 PANEL_Y = 130
-STATE_SYNC_INTERVAL = 0.25
+STATE_SYNC_INTERVAL = 0.10
 HEARTBEAT_INTERVAL = 5.0
 
 
@@ -38,6 +39,7 @@ class OnlineGameScene(Scene):
         self.result_sent = False
         self.countdown = Countdown(duration=0.0)
         self.repeat = RepeatController(GAME_REPEAT)
+        self.heartbeat_request = BackgroundRequest()
 
     def on_enter(self) -> None:
         self.game = TetrisGame(seed=self.match_seed())
@@ -49,6 +51,7 @@ class OnlineGameScene(Scene):
         self.result_sent = False
         self.countdown.reset()
         self.repeat.reset()
+        self.heartbeat_request = BackgroundRequest()
         self.status = ""
         self.app.audio.play_music("game_theme")
         self.open_socket()
@@ -171,6 +174,7 @@ class OnlineGameScene(Scene):
 
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
+        self.apply_heartbeat_result()
         self.heartbeat_elapsed += dt
         if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
@@ -203,13 +207,22 @@ class OnlineGameScene(Scene):
         player = self.app.online_player
         if not room or not player:
             return
-        try:
-            self.app.online_room = self.api.heartbeat(room["id"], player["id"])
-            if len(self.app.online_room.get("players", [])) < 2 and not self.result:
+        self.heartbeat_request.start(self.api.heartbeat, room["id"], player["id"])
+
+    def apply_heartbeat_result(self) -> None:
+        result = self.heartbeat_request.drain()
+        if result is None:
+            return
+        ok, payload = result
+        if not ok:
+            self.status = "로딩 중"
+            return
+        room = self.app.online_room
+        if room and payload.get("id") == room.get("id"):
+            self.app.online_room = payload
+            if len(payload.get("players", [])) < 2 and not self.result:
                 self.status = "상대 연결 끊김"
                 self.result = "WIN"
-        except ApiError:
-            self.status = "로딩 중"
 
     def apply_socket_messages(self) -> None:
         if not self.socket:
@@ -336,7 +349,7 @@ class OnlineGameScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        self.draw_text(screen, "온라인 매치", (80, 70))
+        self.draw_text(screen, "Online Match", (80, 70))
         local_state = self.snapshot()
         draw_tetris_panel(screen, self.font, self.small_font, local_state, LEFT_PANEL_X, PANEL_Y, self.local_label())
         self.draw_stats(screen, local_state, LEFT_PANEL_X + 88, 616)
@@ -396,5 +409,5 @@ class OnlineGameScene(Scene):
 
     def draw_stats(self, screen: pygame.Surface, state: dict, x: int, y: int) -> None:
         color = RED if state.get("game_over") else CYAN
-        text = f"{state['score']}   {state['lines']}줄   LV {state['level']}"
+        text = f"Score {state['score']}   Lines {state['lines']}   LV {state['level']}"
         screen.blit(self.small_font.render(text, True, color), (x, y))

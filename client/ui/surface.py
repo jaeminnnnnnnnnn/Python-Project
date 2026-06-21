@@ -1,6 +1,7 @@
 import pygame
 
 from client.constants import CYAN, GRAY, WHITE
+from client.ui.fonts import game_font
 
 
 PANEL_BG = (28, 32, 40)
@@ -22,7 +23,7 @@ def draw_header(screen: pygame.Surface, font: pygame.font.Font, title: str, subt
     screen.blit(title_surface, (80, 58))
     pygame.draw.line(screen, CYAN, (80, 106), (880, 106), 2)
     if subtitle:
-        subtitle_surface = pygame.font.Font(None, 24).render(subtitle, True, GRAY)
+        subtitle_surface = game_font(24).render(subtitle, True, GRAY)
         screen.blit(subtitle_surface, (82, 116))
 
 

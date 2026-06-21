@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from client.constants import WHITE
+from client.ui.fonts import game_font
 
 if TYPE_CHECKING:
     from client.game.app import GameApp
@@ -13,8 +14,8 @@ if TYPE_CHECKING:
 class Scene:
     def __init__(self, app: GameApp) -> None:
         self.app = app
-        self.font = pygame.font.Font(None, 42)
-        self.small_font = pygame.font.Font(None, 28)
+        self.font = game_font(34)
+        self.small_font = game_font(22)
 
     def on_enter(self) -> None:
         pass

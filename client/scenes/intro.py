@@ -2,6 +2,7 @@ import pygame
 
 from client.constants import BLACK, CYAN
 from client.scenes.base import Scene
+from client.ui.fonts import game_font
 
 
 class IntroScene(Scene):
@@ -24,6 +25,6 @@ class IntroScene(Scene):
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        title_font = pygame.font.Font(None, 96)
+        title_font = game_font(78)
         title = title_font.render("GTRIS", True, CYAN)
         screen.blit(title, title.get_rect(center=(480, 360)))

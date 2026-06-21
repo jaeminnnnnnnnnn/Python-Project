@@ -159,7 +159,7 @@ class OnlineLobbyScene(Scene):
         if self.mode == "password":
             self.draw_password_form(screen)
             return
-        draw_header(screen, self.font, "온라인")
+        draw_header(screen, self.font, "Online")
 
         list_rect = pygame.Rect(70, 145, 820, 455)
         draw_panel(screen, list_rect)

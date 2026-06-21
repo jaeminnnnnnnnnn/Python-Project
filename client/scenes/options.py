@@ -83,12 +83,12 @@ class OptionsScene(Scene):
         if self.mode == "controls":
             self.draw_controls(screen)
             return
-        self.draw_text(screen, "설정", (80, 70))
+        self.draw_text(screen, "Options", (80, 70))
         rows = [
-            ("배경 음악", "켜짐" if self.settings.music_enabled else "꺼짐"),
-            ("효과음", "켜짐" if self.settings.sfx_enabled else "꺼짐"),
-            ("게임 조작키", ""),
-            ("게임 종료", ""),
+            ("Music", "On" if self.settings.music_enabled else "Off"),
+            ("SFX", "On" if self.settings.sfx_enabled else "Off"),
+            ("Controls", ""),
+            ("Quit", ""),
         ]
         for index, (label, value) in enumerate(rows):
             color = CYAN if index == self.selected else WHITE
@@ -99,7 +99,7 @@ class OptionsScene(Scene):
         screen.blit(hint, (80, 650))
 
     def draw_controls(self, screen: pygame.Surface) -> None:
-        self.draw_text(screen, "게임 조작키", (80, 70))
+        self.draw_text(screen, "Controls", (80, 70))
         if self.waiting_action:
             label = ACTION_LABELS[self.waiting_action]
             self.draw_text(screen, f"{label} 키 입력", (110, 150), small=True)
