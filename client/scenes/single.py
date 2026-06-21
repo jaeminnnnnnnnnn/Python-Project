@@ -102,7 +102,7 @@ class SingleScene(Scene):
         draw_tetris_panel(screen, self.font, self.small_font, self.snapshot(), PANEL_X, PANEL_Y, "")
         self.draw_sidebar(screen)
         if self.game.game_over:
-            overlay = self.font.render("GAME OVER - Press R", True, WHITE)
+            overlay = self.font.render("GAME OVER", True, WHITE)
             screen.blit(overlay, overlay.get_rect(center=(480, 360)))
 
     def snapshot(self) -> dict:
@@ -112,9 +112,3 @@ class SingleScene(Scene):
         self.draw_text(screen, f"Score {self.game.score}", (70, 130), small=True)
         self.draw_text(screen, f"Lines {self.game.lines}", (70, 165), small=True)
         self.draw_text(screen, f"Level {self.game.level}", (70, 200), small=True)
-        combo = max(self.game.combo, 0)
-        b2b = "ON" if self.game.back_to_back else "OFF"
-        screen.blit(self.small_font.render(f"Combo Streak {combo}", True, CYAN), (70, 260))
-        screen.blit(self.small_font.render(f"Back-to-Back Bonus {b2b}", True, CYAN), (70, 295))
-        hint = self.small_font.render("Esc: Menu   R: Retry after game over", True, GRAY)
-        screen.blit(hint, (70, 650))

@@ -33,7 +33,7 @@ class OnlineGameScene(Scene):
         self.fall_elapsed = 0.0
         self.send_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
-        self.status = "Live match sync"
+        self.status = ""
         self.result: str | None = None
         self.result_sent = False
         self.countdown = Countdown(duration=0.0)
@@ -49,7 +49,7 @@ class OnlineGameScene(Scene):
         self.result_sent = False
         self.countdown.reset()
         self.repeat.reset()
-        self.status = "Live match sync"
+        self.status = ""
         self.app.audio.play_music("game_theme")
         self.open_socket()
         self.send_state()
@@ -180,7 +180,7 @@ class OnlineGameScene(Scene):
         if self.countdown.active:
             self.countdown.update(dt)
             if not self.countdown.active:
-                self.status = "Live match sync"
+                self.status = ""
                 self.send_state()
             return
         if not self.game.game_over:
@@ -345,25 +345,15 @@ class OnlineGameScene(Scene):
         if remote:
             draw_tetris_panel(screen, self.font, self.small_font, remote, RIGHT_PANEL_X, PANEL_Y, self.remote_label(remote_id))
             self.draw_stats(screen, remote, RIGHT_PANEL_X + 88, 616)
-            if remote.get("game_over"):
-                self.draw_text(screen, "Opponent topped out", (RIGHT_PANEL_X + 88, 96), small=True)
         else:
             empty_state = {"grid": empty_grid(), "ghost": [], "hold": None, "next": []}
             draw_tetris_panel(screen, self.font, self.small_font, empty_state, RIGHT_PANEL_X, PANEL_Y, self.remote_label(remote_id))
-            self.draw_text(screen, "Waiting for opponent state...", (RIGHT_PANEL_X + 88, 616), small=True)
 
-        if self.game.game_over:
-            self.draw_text(screen, "You topped out", (LEFT_PANEL_X + 88, 96), small=True)
         if self.result:
             self.draw_result_screen(screen)
         elif self.countdown.active:
             surface = self.font.render(self.countdown.label, True, WHITE)
             screen.blit(surface, surface.get_rect(center=(480, 340)))
-        if self.status:
-            screen.blit(self.small_font.render(self.status, True, GRAY), (380, 94))
-        hint_text = "R: Rematch setup   Esc: Back to Room" if self.result else "Esc: Back to Room"
-        hint = self.small_font.render(hint_text, True, GRAY)
-        screen.blit(hint, (80, 650))
 
     def draw_result_screen(self, screen: pygame.Surface) -> None:
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
@@ -379,22 +369,11 @@ class OnlineGameScene(Scene):
         title_surface = self.font.render(title, True, title_color)
         screen.blit(title_surface, title_surface.get_rect(center=(panel.centerx, panel.y + 72)))
 
-        reason = self.result_reason()
-        reason_surface = self.small_font.render(reason, True, WHITE)
-        screen.blit(reason_surface, reason_surface.get_rect(center=(panel.centerx, panel.y + 130)))
-
-        rematch_surface = self.small_font.render("R: Ready for rematch", True, CYAN)
+        rematch_surface = self.small_font.render("R REMATCH", True, CYAN)
         screen.blit(rematch_surface, rematch_surface.get_rect(center=(panel.centerx, panel.y + 188)))
 
-        back_surface = self.small_font.render("Esc: Back to room", True, GRAY)
+        back_surface = self.small_font.render("ESC ROOM", True, GRAY)
         screen.blit(back_surface, back_surface.get_rect(center=(panel.centerx, panel.y + 224)))
-
-    def result_reason(self) -> str:
-        if self.status in {"Opponent left", "Opponent disconnected"}:
-            return self.status
-        if self.result == "WIN":
-            return "Opponent topped out"
-        return "You topped out"
 
     def first_remote_state(self) -> dict | None:
         return next(iter(self.remote_states.values()), None)
@@ -417,7 +396,5 @@ class OnlineGameScene(Scene):
 
     def draw_stats(self, screen: pygame.Surface, state: dict, x: int, y: int) -> None:
         color = RED if state.get("game_over") else CYAN
-        combo = max(state.get("combo", -1), 0)
-        b2b = " Back-to-Back" if state.get("back_to_back") else ""
-        text = f"Score {state['score']}   Lines {state['lines']}   Combo {combo}{b2b}"
+        text = f"{state['score']}   {state['lines']} L   LV {state['level']}"
         screen.blit(self.small_font.render(text, True, color), (x, y))

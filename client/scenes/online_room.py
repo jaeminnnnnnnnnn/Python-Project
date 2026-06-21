@@ -15,7 +15,7 @@ class OnlineRoomScene(Scene):
     def __init__(self, app) -> None:
         super().__init__(app)
         self.api = ApiClient()
-        self.status = "R: Ready   Esc: Leave"
+        self.status = "R READY   ESC LEAVE"
         self.poll_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
         self.socket: RoomSocketClient | None = None
@@ -74,7 +74,7 @@ class OnlineRoomScene(Scene):
         try:
             self.app.online_room = self.api.heartbeat(room["id"], player["id"])
         except ApiError as exc:
-            self.status = f"Heartbeat failed: {exc}"
+            self.status = f"OFFLINE {exc}"
 
     def apply_socket_messages(self) -> None:
         if not self.socket:
@@ -87,7 +87,7 @@ class OnlineRoomScene(Scene):
             if message.get("type") == "room.state":
                 self.app.online_room = message["room"]
                 self.websocket_failed = False
-                self.status = "Live room sync   R: Ready   Esc: Leave"
+                self.status = "R READY   ESC LEAVE"
             else:
                 unhandled.append(message)
         self.socket.put_back(unhandled)
@@ -99,7 +99,7 @@ class OnlineRoomScene(Scene):
             return
         try:
             self.app.online_room = self.api.get_room(room["id"])
-            self.status = "R: Ready   Esc: Leave"
+            self.status = "R READY   ESC LEAVE"
         except ApiError as exc:
             self.status = f"Refresh failed: {exc}"
 
@@ -111,9 +111,9 @@ class OnlineRoomScene(Scene):
         current = self.current_player_ready()
         try:
             self.app.online_room = self.api.set_ready(room["id"], player["id"], not current)
-            self.status = "Ready updated"
+            self.status = "R READY   ESC LEAVE"
         except ApiError as exc:
-            self.status = f"Ready failed: {exc}"
+            self.status = f"READY FAILED {exc}"
 
     def leave_room(self) -> None:
         room = self.app.online_room
@@ -156,7 +156,6 @@ class OnlineRoomScene(Scene):
             draw_panel(screen, row, border_color=CYAN if is_me else GRAY, fill_color=(32, 42, 48) if is_me else (28, 32, 40))
             if not room_player:
                 screen.blit(self.font.render(f"P{index + 1}", True, GRAY), (row.x + 28, row.y + 20))
-                screen.blit(self.small_font.render("Waiting for player", True, GRAY), (row.x + 120, row.y + 28))
                 continue
             is_me = room_player["id"] == player["id"]
             name = player_label(room, room_player["id"]) + (" (You)" if is_me else "")
@@ -168,7 +167,7 @@ class OnlineRoomScene(Scene):
             screen.blit(ready_surface, ready_surface.get_rect(midright=(row.right - 28, row.centery)))
         slots_left = room["max_players"] - len(room["players"])
         if slots_left:
-            self.draw_text(screen, "Waiting for another player...", (120, 525), small=True)
+            self.draw_text(screen, "WAITING", (120, 525), small=True)
         if room["started"]:
-            self.draw_text(screen, "Match starting...", (120, 560), small=True)
+            self.draw_text(screen, "STARTING", (120, 560), small=True)
         draw_status_bar(screen, self.small_font, self.status)

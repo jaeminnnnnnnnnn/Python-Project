@@ -37,4 +37,4 @@ class MenuScene(Scene):
             draw_panel(screen, rect, border_color=color if index == self.selected else GRAY)
             surface = self.font.render(label, True, color)
             screen.blit(surface, surface.get_rect(midleft=(rect.x + 28, rect.centery)))
-        draw_status_bar(screen, self.small_font, "Tab/Arrow: Move   Enter: Select   Esc: Exit")
+        draw_status_bar(screen, self.small_font, "ARROWS MOVE   ENTER SELECT   ESC EXIT")
