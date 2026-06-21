@@ -12,7 +12,6 @@ CREATE_STATUS = "Click Password to lock   Tab Switch field   Enter Create"
 JOIN_STATUS = "Type password   Enter Join   Esc Back"
 MAX_TITLE_LENGTH = 24
 MAX_PASSWORD_LENGTH = 16
-ROOM_REFRESH_INTERVAL = 1.0
 
 
 class OnlineLobbyScene(Scene):
@@ -25,7 +24,6 @@ class OnlineLobbyScene(Scene):
         self.server_online = False
         self.loaded_once = False
         self.loading = False
-        self.refresh_elapsed = 0.0
         self.mode = "list"
         self.create_title = ""
         self.create_password_enabled = False
@@ -39,7 +37,6 @@ class OnlineLobbyScene(Scene):
 
     def on_enter(self) -> None:
         self.mode = "list"
-        self.refresh_elapsed = 0.0
         self.refresh_request = BackgroundRequest()
         self.refresh()
 
@@ -55,12 +52,6 @@ class OnlineLobbyScene(Scene):
 
     def update(self, dt: float) -> None:
         self.apply_refresh_result()
-        if self.mode != "list":
-            return
-        self.refresh_elapsed += dt
-        if self.refresh_elapsed >= ROOM_REFRESH_INTERVAL:
-            self.refresh_elapsed = 0.0
-            self.refresh()
 
     def apply_refresh_result(self) -> None:
         result = self.refresh_request.drain()

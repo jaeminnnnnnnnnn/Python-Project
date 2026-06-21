@@ -1,4 +1,3 @@
-import time
 from uuid import uuid4
 
 from server.app.models import Room
@@ -7,13 +6,10 @@ from shared.schemas import Player
 
 
 class RoomStore:
-    stale_timeout_seconds = 60.0
-
     def __init__(self) -> None:
         self.rooms: dict[str, Room] = {}
 
     def list_rooms(self) -> list[Room]:
-        self.cleanup_stale_players()
         return list(self.rooms.values())
 
     def create_room(self, title: str, password: str | None, player_name: str) -> tuple[Room, Player]:
@@ -26,7 +22,6 @@ class RoomStore:
 
     def join_room(self, room_id: str, player_name: str, password: str | None) -> tuple[Room, Player]:
         room = self.get(room_id)
-        self.cleanup_room(room)
         if room.password and room.password != password:
             raise InvalidPasswordError()
         if len(room.players) >= room.max_players:
@@ -38,7 +33,6 @@ class RoomStore:
 
     def set_ready(self, room_id: str, player_id: str, ready: bool) -> Room:
         room = self.get(room_id)
-        self.cleanup_room(room)
         if player_id not in room.players:
             raise RoomNotFoundError()
         room.touch(player_id)
@@ -61,7 +55,6 @@ class RoomStore:
 
     def reset_match(self, room_id: str, player_id: str) -> Room:
         room = self.get(room_id)
-        self.cleanup_room(room)
         if player_id not in room.players:
             raise RoomNotFoundError()
         room.touch(player_id)
@@ -73,7 +66,6 @@ class RoomStore:
 
     def heartbeat(self, room_id: str, player_id: str) -> Room:
         room = self.get(room_id)
-        self.cleanup_room(room)
         if player_id not in room.players:
             raise RoomNotFoundError()
         room.touch(player_id)
@@ -84,36 +76,12 @@ class RoomStore:
             room = self.rooms[room_id]
         except KeyError as exc:
             raise RoomNotFoundError() from exc
-        self.cleanup_room(room)
-        if room_id not in self.rooms:
-            raise RoomNotFoundError()
         return room
 
     def cleanup_stale_players(self, now: float | None = None) -> list[str]:
-        removed_rooms: list[str] = []
-        for room in list(self.rooms.values()):
-            if self.cleanup_room(room, now):
-                removed_rooms.append(room.id)
-        return removed_rooms
+        return []
 
     def cleanup_room(self, room: Room, now: float | None = None) -> bool:
-        now = time.time() if now is None else now
-        stale_ids = [
-            player_id
-            for player_id in room.players
-            if now - room.last_seen.get(player_id, now) > self.stale_timeout_seconds
-        ]
-        for player_id in stale_ids:
-            room.players.pop(player_id, None)
-            room.last_seen.pop(player_id, None)
-        if stale_ids:
-            room.started = False
-            room.match_seed = None
-            for player in room.players.values():
-                player.ready = False
-        if not room.players and room.id in self.rooms:
-            self.rooms.pop(room.id, None)
-            return True
         return False
 
     def _new_player(self, name: str) -> Player:

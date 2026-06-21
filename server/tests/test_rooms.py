@@ -63,17 +63,17 @@ def test_heartbeat_keeps_player_in_room() -> None:
     assert first.id in room.last_seen
 
 
-def test_room_survives_short_listing_gap() -> None:
+def test_room_survives_without_heartbeat() -> None:
     store = RoomStore()
     room, first = store.create_room("Room", None, "A")
 
-    removed = store.cleanup_stale_players(now=room.last_seen[first.id] + 30.0)
+    removed = store.cleanup_stale_players(now=999999.0)
 
     assert removed == []
     assert store.list_rooms()[0].id == room.id
 
 
-def test_cleanup_removes_stale_player_and_resets_match() -> None:
+def test_cleanup_does_not_remove_stale_player_or_reset_match() -> None:
     store = RoomStore()
     room, first = store.create_room("Room", None, "A")
     _, second = store.join_room(room.id, "B", None)
@@ -81,18 +81,18 @@ def test_cleanup_removes_stale_player_and_resets_match() -> None:
     store.set_ready(room.id, second.id, True)
     room.last_seen[second.id] = 0.0
 
-    store.cleanup_stale_players(now=RoomStore.stale_timeout_seconds + 1)
+    store.cleanup_stale_players(now=999999.0)
 
-    assert second.id not in room.players
-    assert not room.started
-    assert all(not player.ready for player in room.players.values())
+    assert second.id in room.players
+    assert room.started
+    assert all(player.ready for player in room.players.values())
 
 
-def test_cleanup_removes_empty_room() -> None:
+def test_cleanup_does_not_remove_empty_room() -> None:
     store = RoomStore()
     room, first = store.create_room("Room", None, "A")
     room.last_seen[first.id] = 0.0
 
-    store.cleanup_stale_players(now=RoomStore.stale_timeout_seconds + 1)
+    store.cleanup_stale_players(now=999999.0)
 
-    assert room.id not in store.rooms
+    assert room.id in store.rooms
