@@ -20,6 +20,7 @@ class GameApp:
         pygame.init()
         pygame.display.set_caption(config.TITLE)
         self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        self.fullscreen = False
         self.clock = pygame.time.Clock()
         self.running = True
         self.settings = load_settings()
@@ -56,6 +57,11 @@ class GameApp:
     def key(self, action: str) -> int:
         return self.settings.key_bindings[action]
 
+    def toggle_fullscreen(self) -> None:
+        self.fullscreen = not self.fullscreen
+        flags = pygame.FULLSCREEN if self.fullscreen else 0
+        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT), flags)
+
     def run(self) -> None:
         while self.running:
             dt = self.clock.tick(config.FPS) / 1000
@@ -63,6 +69,8 @@ class GameApp:
             for event in events:
                 if event.type == pygame.QUIT:
                     self.quit()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                    self.toggle_fullscreen()
 
             self.scene.handle_events(events)
             self.scene.update(dt)
