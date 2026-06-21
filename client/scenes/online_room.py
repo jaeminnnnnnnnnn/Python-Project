@@ -7,6 +7,9 @@ from client.player_labels import player_label
 from client.scenes.base import Scene
 
 
+HEARTBEAT_INTERVAL = 5.0
+
+
 class OnlineRoomScene(Scene):
     def __init__(self, app) -> None:
         super().__init__(app)
@@ -51,7 +54,7 @@ class OnlineRoomScene(Scene):
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
         self.heartbeat_elapsed += dt
-        if self.heartbeat_elapsed >= 10.0:
+        if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
             self.send_heartbeat()
         self.poll_elapsed += dt

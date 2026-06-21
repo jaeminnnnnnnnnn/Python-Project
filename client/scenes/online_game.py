@@ -18,6 +18,7 @@ LEFT_PANEL_X = 48
 RIGHT_PANEL_X = 496
 PANEL_Y = 130
 STATE_SYNC_INTERVAL = 0.1
+HEARTBEAT_INTERVAL = 5.0
 
 
 class OnlineGameScene(Scene):
@@ -33,7 +34,7 @@ class OnlineGameScene(Scene):
         self.status = "Live match sync"
         self.result: str | None = None
         self.result_sent = False
-        self.countdown = Countdown()
+        self.countdown = Countdown(duration=0.0)
 
     def on_enter(self) -> None:
         self.game = TetrisGame(seed=self.match_seed())
@@ -44,7 +45,7 @@ class OnlineGameScene(Scene):
         self.result = None
         self.result_sent = False
         self.countdown.reset()
-        self.status = "Match starting"
+        self.status = "Live match sync"
         self.app.audio.play_music("game_theme")
         self.open_socket()
         self.send_state()
@@ -133,7 +134,7 @@ class OnlineGameScene(Scene):
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
         self.heartbeat_elapsed += dt
-        if self.heartbeat_elapsed >= 10.0:
+        if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
             self.send_heartbeat()
         if self.countdown.active:
@@ -176,7 +177,9 @@ class OnlineGameScene(Scene):
         player = self.app.online_player
         my_id = player["id"] if player else None
         for message in self.socket.drain():
-            if message.get("type") == "match.state" and message.get("player_id") != my_id:
+            if message.get("type") == "room.state":
+                self.apply_room_state(message["room"])
+            elif message.get("type") == "match.state" and message.get("player_id") != my_id:
                 self.remote_states[message["player_id"]] = message["state"]
                 if message["state"].get("game_over") and not self.game.game_over:
                     self.result = "WIN"
@@ -189,6 +192,25 @@ class OnlineGameScene(Scene):
                 self.result = "WIN"
             elif message.get("type") == "match.result" and message.get("loser_id") == my_id:
                 self.result = "LOSE"
+
+    def apply_room_state(self, room: dict) -> None:
+        self.app.online_room = room
+        player = self.app.online_player
+        if not player:
+            return
+        player_ids = {room_player["id"] for room_player in room.get("players", [])}
+        if player["id"] not in player_ids:
+            self.status = "You left the room"
+            self.result = "LOSE"
+            return
+        if len(player_ids) < 2 and not self.result:
+            self.status = "Opponent left"
+            self.result = "WIN"
+            self.result_sent = True
+            return
+        if not room.get("started") and not self.result:
+            self.status = "Match canceled"
+            self.app.change_scene("online_room")
 
     def after_step(self, result=None) -> None:
         if result and result.attack:
