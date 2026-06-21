@@ -22,12 +22,16 @@ class OnlineRoomScene(Scene):
         self.socket: RoomSocketClient | None = None
         self.websocket_failed = False
         self.heartbeat_request = BackgroundRequest()
+        self.ready_request = BackgroundRequest()
+        self.refresh_request = BackgroundRequest()
 
     def on_enter(self) -> None:
         self.poll_elapsed = 0.0
         self.heartbeat_elapsed = 0.0
         self.websocket_failed = False
         self.heartbeat_request = BackgroundRequest()
+        self.ready_request = BackgroundRequest()
+        self.refresh_request = BackgroundRequest()
         self.refresh()
         self.open_socket()
 
@@ -65,6 +69,8 @@ class OnlineRoomScene(Scene):
     def update(self, dt: float) -> None:
         self.apply_socket_messages()
         self.apply_heartbeat_result()
+        self.apply_ready_result()
+        self.apply_refresh_result()
         self.heartbeat_elapsed += dt
         if self.heartbeat_elapsed >= HEARTBEAT_INTERVAL:
             self.heartbeat_elapsed = 0.0
@@ -117,23 +123,45 @@ class OnlineRoomScene(Scene):
         if not room:
             self.app.change_scene("online_lobby")
             return
-        try:
-            self.app.online_room = self.api.get_room(room["id"])
-            self.status = "Click Ready   Esc Leave"
-        except ApiError:
+        if self.refresh_request.start(self.api.get_room, room["id"]):
             self.status = "Loading..."
+
+    def apply_refresh_result(self) -> None:
+        result = self.refresh_request.drain()
+        if result is None:
+            return
+        ok, payload = result
+        if ok:
+            room = self.app.online_room
+            if room and payload.get("id") == room.get("id"):
+                self.app.online_room = payload
+            self.status = "Click Ready   Esc Leave"
+        else:
+            self.status = "Refresh failed"
 
     def toggle_ready(self) -> None:
         room = self.app.online_room
         player = self.app.online_player
         if not room or not player:
             return
+        if self.ready_request.running:
+            return
         current = self.current_player_ready()
-        try:
-            self.app.online_room = self.api.set_ready(room["id"], player["id"], not current)
+        if self.ready_request.start(self.api.set_ready, room["id"], player["id"], not current):
+            self.status = "Ready..."
+
+    def apply_ready_result(self) -> None:
+        result = self.ready_request.drain()
+        if result is None:
+            return
+        ok, payload = result
+        if ok:
+            room = self.app.online_room
+            if room and payload.get("id") == room.get("id"):
+                self.app.online_room = payload
             self.status = "Click Ready   Esc Leave"
-        except ApiError:
-            self.status = "Ready failed"
+        else:
+            self.status = "Ready failed - press R again"
 
     def leave_room(self) -> None:
         room = self.app.online_room

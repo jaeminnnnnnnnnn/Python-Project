@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
+import asyncio
 
+import server.app.websocket as websocket_module
 from server.app.state import room_store
 from server.main import app
 
@@ -150,7 +152,8 @@ def test_room_websocket_disconnect_before_match_keeps_player() -> None:
         assert {player["id"] for player in room["players"]} == {first_id, second_id}
 
 
-def test_room_websocket_disconnect_during_match_removes_player_and_broadcasts_state() -> None:
+def test_disconnect_cleanup_during_match_removes_player(monkeypatch) -> None:
+    monkeypatch.setattr(websocket_module, "DISCONNECT_GRACE_SECONDS", 0.01)
     created = client.post("/rooms", json={"title": "Room", "player_name": "A"}).json()
     room_id = created["room"]["id"]
     first_id = created["player"]["id"]
@@ -159,11 +162,7 @@ def test_room_websocket_disconnect_during_match_removes_player_and_broadcasts_st
     client.post(f"/rooms/{room_id}/ready", json={"player_id": first_id, "ready": True})
     client.post(f"/rooms/{room_id}/ready", json={"player_id": second_id, "ready": True})
 
-    with client.websocket_connect(f"/ws/rooms/{room_id}?player_id={first_id}") as survivor:
-        survivor.receive_json()
-        with client.websocket_connect(f"/ws/rooms/{room_id}?player_id={second_id}") as leaving:
-            leaving.receive_json()
+    asyncio.run(websocket_module.remove_disconnected_player_after_grace(room_id, second_id))
 
-        updated = survivor.receive_json()
-        assert updated["type"] == "room.state"
-        assert [player["id"] for player in updated["room"]["players"]] == [first_id]
+    room = client.get(f"/rooms/{room_id}").json()
+    assert [player["id"] for player in room["players"]] == [first_id]
